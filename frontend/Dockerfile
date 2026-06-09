@@ -2,15 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy dependency files first for Docker layer caching
+# Install dependencies first for better layer caching
 COPY package*.json ./
+RUN npm ci
 
-RUN npm install
-
-# Copy application source code
+# Copy the app source
 COPY . .
 
+ENV NEXT_TELEMETRY_DISABLED=1
 EXPOSE 3000
 
-# Run Next.js dev server with hot-reload
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]
