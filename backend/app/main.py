@@ -3,8 +3,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
 from app.api.health import router as health_router
+from app.config import settings
 
 
 def create_app() -> FastAPI:
@@ -12,7 +12,9 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title=settings.APP_NAME,
         version=settings.VERSION,
-        description="Multi-Agent Customer Support Platform powered by LangGraph and MCP.",
+        description=(
+            "Multi-Agent Customer Support Platform powered by LangGraph and MCP."
+        ),
         docs_url="/docs",
         redoc_url="/redoc",
     )
