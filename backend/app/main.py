@@ -5,6 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
 from app.config import settings
+from app.exceptions import register_exception_handlers
+from app.logging_config import setup_logging
+from app.middleware import CorrelationIdMiddleware
+
+# Set up logging immediately
+setup_logging(json_format=not settings.DEBUG, log_level="INFO")
 
 
 def create_app() -> FastAPI:
@@ -19,6 +25,9 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
+    # Register Correlation ID middleware (outermost)
+    application.add_middleware(CorrelationIdMiddleware)
+
     # CORS middleware
     application.add_middleware(
         CORSMiddleware,
@@ -27,6 +36,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Register Exception Handlers
+    register_exception_handlers(application)
 
     # Include routers
     application.include_router(health_router)
@@ -45,3 +57,15 @@ async def root() -> dict:
         "version": settings.VERSION,
         "docs": "/docs",
     }
+
+
+@app.get("/api/trigger-error")
+async def trigger_error() -> None:
+    """Endpoint to trigger an unhandled Exception for testing purposes."""
+    raise ValueError("This is a simulated internal server error.")
+
+
+@app.get("/api/test-validation")
+async def test_validation(value: int) -> dict:
+    """Endpoint to trigger a validation error if value is not an integer."""
+    return {"value": value}
