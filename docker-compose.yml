@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=support_ai
+      - POSTGRES_PASSWORD=support_ai
+      - POSTGRES_DB=support_ai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U support_ai -d support_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build: ./backend
     ports:
@@ -8,6 +25,10 @@ services:
       - /app/.venv # preserve container's virtual environment
     environment:
       - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://support_ai:support_ai@postgres:5432/support_ai
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -24,3 +45,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  postgres_data:

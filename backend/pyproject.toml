@@ -5,10 +5,13 @@ description = "Multi-Agent Customer Support Platform - Backend"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.17.2",
+    "asyncpg>=0.31.0",
     "colorama>=0.4.6",
     "fastapi[standard]==0.136.3",
     "httpx2>=2.3.0",
     "pydantic-settings>=2.14.1",
+    "sqlalchemy[asyncio]>=2.0.45",
     "structlog>=26.1.0",
 ]
 
@@ -46,5 +49,4 @@ known-first-party = ["app"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
-
 

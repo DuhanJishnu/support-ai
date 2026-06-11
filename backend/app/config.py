@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     VERSION: str = "0.1.0"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://support_ai:support_ai@localhost:5432/support_ai"
+    )
 
     model_config = {
         "env_file": ".env",
