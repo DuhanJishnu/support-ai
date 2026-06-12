@@ -51,8 +51,7 @@ def create_app() -> FastAPI:
     async def startup_event():
         """Initialize MCP client on application startup."""
         await initialize_mcp_client(
-            telemetry_url=settings.MCP_TELEMETRY_SERVER_URL,
-            billing_url=settings.MCP_BILLING_SERVER_URL,
+            server_urls=settings.mcp_server_urls,
             timeout=settings.MCP_REQUEST_TIMEOUT,
         )
 

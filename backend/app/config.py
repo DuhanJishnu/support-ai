@@ -13,9 +13,18 @@ class Settings(BaseSettings):
     DATABASE_URL: str = (
         "postgresql+asyncpg://support_ai:support_ai@localhost:5432/support_ai"
     )
-    MCP_TELEMETRY_SERVER_URL: str = "http://localhost:8001"
-    MCP_BILLING_SERVER_URL: str = "http://localhost:8002"
+    MCP_TELEMETRY_SERVER_URL: str = "http://telemetry:8001/sse"
+    MCP_BILLING_SERVER_URL: str = "http://billing:8002/sse"
+    MCP_SERVER_URLS: list[str] = []
     MCP_REQUEST_TIMEOUT: float = 30.0
+
+    @property
+    def mcp_server_urls(self) -> list[str]:
+        """Return configured MCP server URLs, preserving existing env vars."""
+        return self.MCP_SERVER_URLS or [
+            self.MCP_TELEMETRY_SERVER_URL,
+            self.MCP_BILLING_SERVER_URL,
+        ]
 
     model_config = {
         "env_file": ".env",

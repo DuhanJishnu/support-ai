@@ -1,6 +1,7 @@
 """Tests for MCP Client integration."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -11,10 +12,23 @@ from app.mcp_client import MCPClientManager
 def mcp_client():
     """Fixture to create an MCP client for testing."""
     return MCPClientManager(
-        telemetry_server_url="http://localhost:8001",
-        billing_server_url="http://localhost:8002",
+        telemetry_server_url="http://telemetry:8001/sse",
+        billing_server_url="http://billing:8002/sse",
         timeout=10.0,
     )
+
+
+def mcp_context(tools=None, result=None, enter_error=None):
+    """Create a mocked FastMCP client async context."""
+    client = AsyncMock()
+    if enter_error:
+        client.__aenter__.side_effect = enter_error
+    else:
+        client.__aenter__.return_value = client
+    client.list_tools.return_value = tools or []
+    if result is not None:
+        client.call_tool.return_value = result
+    return client
 
 
 class TestMCPClientManager:
@@ -22,8 +36,12 @@ class TestMCPClientManager:
 
     def test_initialization(self, mcp_client):
         """Test that MCPClientManager initializes correctly."""
-        assert mcp_client.telemetry_server_url == "http://localhost:8001"
-        assert mcp_client.billing_server_url == "http://localhost:8002"
+        assert mcp_client.server_urls == [
+            "http://telemetry:8001/sse",
+            "http://billing:8002/sse",
+        ]
+        assert mcp_client.telemetry_server_url == "http://telemetry:8001/sse"
+        assert mcp_client.billing_server_url == "http://billing:8002/sse"
         assert mcp_client.timeout == 10.0
         assert not mcp_client.is_initialized()
         assert len(mcp_client.get_tools()) == 0
@@ -31,57 +49,33 @@ class TestMCPClientManager:
     @pytest.mark.asyncio
     async def test_initialize_success(self, mcp_client):
         """Test successful initialization with mock servers."""
-        # Mock telemetry server tools
-        telemetry_response = {
-            "tools": [
-                {
-                    "name": "get_ride_route_deviation",
-                    "description": "Get ride route deviation",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "ride_id": {"type": "string"}
-                        },
-                    },
-                }
-            ]
+        telemetry_tool = {
+            "name": "get_ride_route_deviation",
+            "description": "Get ride route deviation",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"ride_id": {"type": "string"}},
+            },
+        }
+        billing_tool = {
+            "name": "verify_transaction_status",
+            "description": "Verify transaction status",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"transaction_id": {"type": "string"}},
+            },
         }
 
-        # Mock billing server tools
-        billing_response = {
-            "tools": [
-                {
-                    "name": "verify_transaction_status",
-                    "description": "Verify transaction status",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "transaction_id": {"type": "string"}
-                        },
-                    },
-                }
-            ]
-        }
+        telemetry_client = mcp_context(tools=[telemetry_tool])
+        billing_client = mcp_context(tools=[billing_tool])
 
-        with patch("app.mcp_client.httpx.AsyncClient") as mock_client:
-            mock_async_context = AsyncMock()
-            mock_response_1 = MagicMock()
-            mock_response_1.json.return_value = telemetry_response
-            mock_response_1.raise_for_status.return_value = None
-
-            mock_response_2 = MagicMock()
-            mock_response_2.json.return_value = billing_response
-            mock_response_2.raise_for_status.return_value = None
-
-            mock_async_context.get = AsyncMock(
-                side_effect=[mock_response_1, mock_response_2]
-            )
-            mock_async_context.__aenter__.return_value = mock_async_context
-
-            mock_client.return_value = mock_async_context
-
+        with patch(
+            "app.mcp_client.Client",
+            side_effect=[telemetry_client, billing_client],
+        ) as mock_client:
             await mcp_client.initialize()
 
+            assert mock_client.call_count == 2
             assert mcp_client.is_initialized()
             tools = mcp_client.get_tools()
             assert len(tools) == 2
@@ -91,73 +85,49 @@ class TestMCPClientManager:
     @pytest.mark.asyncio
     async def test_initialize_idempotent(self, mcp_client):
         """Test that initialize can be called multiple times safely."""
-        with patch("app.mcp_client.httpx.AsyncClient") as mock_client:
-            mock_async_context = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.json.return_value = {"tools": []}
-            mock_response.raise_for_status.return_value = None
+        telemetry_client = mcp_context()
+        billing_client = mcp_context()
 
-            mock_async_context.get = AsyncMock(
-                return_value=mock_response
-            )
-            mock_async_context.__aenter__.return_value = mock_async_context
-
-            mock_client.return_value = mock_async_context
-
+        with patch(
+            "app.mcp_client.Client",
+            side_effect=[telemetry_client, billing_client],
+        ) as mock_client:
             await mcp_client.initialize()
             initial_state = mcp_client._is_initialized
 
-            # Call initialize again
             await mcp_client.initialize()
+
             assert mcp_client._is_initialized == initial_state
+            assert mock_client.call_count == 2
 
     @pytest.mark.asyncio
     async def test_discover_tools_from_server(self, mcp_client):
         """Test tool discovery from a specific server."""
-        mock_tools = {
-            "tools": [
-                {
-                    "name": "test_tool",
-                    "description": "Test tool",
-                }
-            ]
+        mock_tool = {
+            "name": "test_tool",
+            "description": "Test tool",
         }
+        client = mcp_context(tools=[mock_tool])
 
-        with patch("app.mcp_client.httpx.AsyncClient") as mock_client:
-            mock_async_context = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.json.return_value = mock_tools
-            mock_response.raise_for_status.return_value = None
-
-            mock_async_context.get = AsyncMock(
-                return_value=mock_response
-            )
-            mock_async_context.__aenter__.return_value = mock_async_context
-
-            mock_client.return_value = mock_async_context
-
+        with patch("app.mcp_client.Client", return_value=client):
             await mcp_client._discover_tools_from_server(
-                "test", "http://test:8000"
+                "test", "http://test:8000/sse"
             )
 
             assert "test_tool" in mcp_client._tools_registry
-            assert mcp_client._tools_registry["test_tool"][0] == "http://test:8000"
+            assert (
+                mcp_client._tools_registry["test_tool"][0]
+                == "http://test:8000/sse"
+            )
 
     @pytest.mark.asyncio
     async def test_discover_tools_server_failure(self, mcp_client):
         """Test handling of server discovery failure."""
-        with patch("app.mcp_client.httpx.AsyncClient") as mock_client:
-            mock_async_context = AsyncMock()
-            mock_async_context.get = AsyncMock(
-                side_effect=Exception("Connection failed")
-            )
-            mock_async_context.__aenter__.return_value = mock_async_context
+        client = mcp_context(enter_error=Exception("Connection failed"))
 
-            mock_client.return_value = mock_async_context
-
-            # Should not raise, just log warning
+        with patch("app.mcp_client.Client", return_value=client):
             await mcp_client._discover_tools_from_server(
-                "test", "http://test:8000"
+                "test", "http://test:8000/sse"
             )
 
             assert len(mcp_client._tools_registry) == 0
@@ -165,32 +135,23 @@ class TestMCPClientManager:
     @pytest.mark.asyncio
     async def test_invoke_tool_success(self, mcp_client):
         """Test successful tool invocation."""
-        # Setup tool in registry
         mcp_client._tools_registry["test_tool"] = (
-            "http://test:8000",
+            "http://test:8000/sse",
             {"name": "test_tool"},
         )
 
         mock_result = {"success": True, "data": "test_data"}
+        client = mcp_context(result=SimpleNamespace(data=mock_result))
 
-        with patch("app.mcp_client.httpx.AsyncClient") as mock_client:
-            mock_async_context = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.json.return_value = mock_result
-            mock_response.raise_for_status.return_value = None
-
-            mock_async_context.post = AsyncMock(
-                return_value=mock_response
-            )
-            mock_async_context.__aenter__.return_value = mock_async_context
-
-            mock_client.return_value = mock_async_context
-
+        with patch("app.mcp_client.Client", return_value=client):
             result = await mcp_client.invoke_tool(
                 "test_tool", {"arg": "value"}
             )
 
-            assert result == mock_result
+            assert result == {"data": mock_result}
+            client.call_tool.assert_awaited_once_with(
+                "test_tool", {"arg": "value"}
+            )
 
     @pytest.mark.asyncio
     async def test_invoke_tool_not_found(self, mcp_client):
@@ -201,21 +162,15 @@ class TestMCPClientManager:
     @pytest.mark.asyncio
     async def test_invoke_tool_failure(self, mcp_client):
         """Test tool invocation failure."""
-        # Setup tool in registry
         mcp_client._tools_registry["test_tool"] = (
-            "http://test:8000",
+            "http://test:8000/sse",
             {"name": "test_tool"},
         )
 
-        with patch("app.mcp_client.httpx.AsyncClient") as mock_client:
-            mock_async_context = AsyncMock()
-            mock_async_context.post = AsyncMock(
-                side_effect=Exception("Request failed")
-            )
-            mock_async_context.__aenter__.return_value = mock_async_context
+        client = mcp_context()
+        client.call_tool.side_effect = Exception("Request failed")
 
-            mock_client.return_value = mock_async_context
-
+        with patch("app.mcp_client.Client", return_value=client):
             with pytest.raises(Exception, match="Request failed"):
                 await mcp_client.invoke_tool("test_tool", {})
 
@@ -225,8 +180,8 @@ class TestMCPClientManager:
         tool2 = {"name": "tool2", "description": "Tool 2"}
 
         mcp_client._tools_registry = {
-            "tool1": ("http://server1:8000", tool1),
-            "tool2": ("http://server2:8000", tool2),
+            "tool1": ("http://server1:8000/sse", tool1),
+            "tool2": ("http://server2:8000/sse", tool2),
         }
 
         tools = mcp_client.get_tools()
@@ -238,7 +193,8 @@ class TestMCPClientManager:
         """Test getting a specific tool that exists."""
         tool = {"name": "test_tool", "description": "Test"}
         mcp_client._tools_registry["test_tool"] = (
-            "http://test:8000", tool
+            "http://test:8000/sse",
+            tool,
         )
 
         result = mcp_client.get_tool("test_tool")

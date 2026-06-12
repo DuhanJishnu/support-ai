@@ -41,10 +41,12 @@ async def mcp_health(mcp_client: MCPClientManager = Depends(get_mcp_client)) -> 
     Returns:
         Dictionary with health status and tool count.
     """
-    return {
-        "status": "ready" if mcp_client.is_initialized() else "initializing",
-        "tools_count": len(mcp_client.get_tools()),
-    }
+    tools_count = len(mcp_client.get_tools())
+    status = "initializing"
+    if mcp_client.is_initialized():
+        status = "ready" if tools_count else "degraded"
+
+    return {"status": status, "tools_count": tools_count}
 
 
 @router.get("/tools")
@@ -99,13 +101,17 @@ async def invoke_tool(
 
 
 async def initialize_mcp_client(
-    telemetry_url: str, billing_url: str, timeout: float = 30.0
+    server_urls: list[str] | None = None,
+    telemetry_url: str | None = None,
+    billing_url: str | None = None,
+    timeout: float = 30.0,
 ) -> MCPClientManager:
     """Initialize the global MCP client manager.
 
     Args:
-        telemetry_url: URL to the telemetry MCP server.
-        billing_url: URL to the billing MCP server.
+        server_urls: URLs to MCP servers.
+        telemetry_url: Legacy URL to the telemetry MCP server.
+        billing_url: Legacy URL to the billing MCP server.
         timeout: Request timeout in seconds.
 
     Returns:
@@ -114,6 +120,7 @@ async def initialize_mcp_client(
     global _mcp_client
 
     _mcp_client = MCPClientManager(
+        server_urls=server_urls,
         telemetry_server_url=telemetry_url,
         billing_server_url=billing_url,
         timeout=timeout,

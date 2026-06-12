@@ -9,6 +9,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "colorama>=0.4.6",
     "fastapi[standard]==0.136.3",
+    "fastmcp>=3.4.2",
     "httpx2>=2.3.0",
     "pydantic-settings>=2.14.1",
     "sqlalchemy[asyncio]>=2.0.45",
@@ -49,4 +50,3 @@ known-first-party = ["app"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
-

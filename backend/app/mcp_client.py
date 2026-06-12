@@ -2,8 +2,9 @@
 
 from typing import Any
 
-import httpx
 import structlog
+from fastmcp import Client
+from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
 
@@ -13,17 +14,22 @@ class MCPClientManager:
 
     def __init__(
         self,
-        telemetry_server_url: str = "http://localhost:8001",
-        billing_server_url: str = "http://localhost:8002",
+        server_urls: list[str] | None = None,
+        telemetry_server_url: str | None = "http://telemetry:8001/sse",
+        billing_server_url: str | None = "http://billing:8002/sse",
         timeout: float = 30.0,
     ):
         """Initialize the MCP Client Manager.
 
         Args:
-            telemetry_server_url: URL to the telemetry MCP server.
-            billing_server_url: URL to the billing MCP server.
+            server_urls: URLs to MCP servers.
+            telemetry_server_url: Legacy URL to the telemetry MCP server.
+            billing_server_url: Legacy URL to the billing MCP server.
             timeout: Request timeout in seconds.
         """
+        self.server_urls = server_urls or [
+            url for url in (telemetry_server_url, billing_server_url) if url
+        ]
         self.telemetry_server_url = telemetry_server_url
         self.billing_server_url = billing_server_url
         self.timeout = timeout
@@ -39,13 +45,8 @@ class MCPClientManager:
 
         logger.info("Starting MCP server discovery...")
 
-        # Discover tools from telemetry server
-        await self._discover_tools_from_server(
-            "telemetry", self.telemetry_server_url
-        )
-
-        # Discover tools from billing server
-        await self._discover_tools_from_server("billing", self.billing_server_url)
+        for server_url in self.server_urls:
+            await self._discover_tools_from_server(server_url, server_url)
 
         logger.info(
             "MCP discovery complete",
@@ -64,23 +65,18 @@ class MCPClientManager:
             server_url: Base URL of the MCP server.
         """
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{server_url}/tools", follow_redirects=True
-                )
-                response.raise_for_status()
+            async with Client(server_url, timeout=self.timeout) as client:
+                tools = await client.list_tools()
 
-                tools_data = response.json()
-                tools = tools_data.get("tools", [])
-
-                for tool in tools:
-                    tool_name = tool.get("name")
-                    if tool_name:
-                        self._tools_registry[tool_name] = (server_url, tool)
-                        logger.info(
-                            f"Discovered tool from {server_name}",
-                            tool_name=tool_name,
-                        )
+            for tool in tools:
+                tool_config = self._serialize_model(tool)
+                tool_name = tool_config.get("name")
+                if tool_name:
+                    self._tools_registry[tool_name] = (server_url, tool_config)
+                    logger.info(
+                        f"Discovered tool from {server_name}",
+                        tool_name=tool_name,
+                    )
 
         except Exception as e:
             logger.warning(
@@ -118,20 +114,16 @@ class MCPClientManager:
                 input=tool_input,
             )
 
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{server_url}/invoke",
-                    json={"tool_name": tool_name, "input": tool_input},
-                )
-                response.raise_for_status()
+            async with Client(server_url, timeout=self.timeout) as client:
+                result = await client.call_tool(tool_name, tool_input)
 
-                result = response.json()
-                logger.info(
-                    "Tool invocation succeeded",
-                    tool_name=tool_name,
-                    result=result,
-                )
-                return result
+            serialized_result = self._serialize_tool_result(result)
+            logger.info(
+                "Tool invocation succeeded",
+                tool_name=tool_name,
+                result=serialized_result,
+            )
+            return serialized_result
 
         except Exception as e:
             logger.error(
@@ -173,3 +165,25 @@ class MCPClientManager:
             True if initialized, False otherwise.
         """
         return self._is_initialized
+
+    @staticmethod
+    def _serialize_model(value: Any) -> dict[str, Any]:
+        """Serialize MCP/Pydantic objects into JSON-ready dictionaries."""
+        if isinstance(value, BaseModel):
+            return value.model_dump(by_alias=True, exclude_none=True)
+        if isinstance(value, dict):
+            return value
+        return dict(value)
+
+    @classmethod
+    def _serialize_tool_result(cls, result: Any) -> dict[str, Any]:
+        """Serialize FastMCP call results while preserving structured data."""
+        data = getattr(result, "data", None)
+        if data is not None:
+            return {"data": data}
+
+        structured_content = getattr(result, "structured_content", None)
+        if structured_content is not None:
+            return {"data": structured_content}
+
+        return cls._serialize_model(result)
