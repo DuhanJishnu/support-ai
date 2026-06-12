@@ -40,7 +40,7 @@ select = [
     "ARG", # flake8-unused-arguments
     "PTH", # flake8-use-pathlib
 ]
-ignore = []
+ignore = ["B008"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
