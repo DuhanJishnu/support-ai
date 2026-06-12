@@ -49,9 +49,15 @@ if __name__ == "__main__":
     # Stdio transport is used for local shell/agent invocation
     # SSE transport is used for network container-to-container calls
     transport = os.getenv("MCP_TRANSPORT", "stdio").lower()
-    port = int(os.getenv("PORT", "8002"))
+    port = os.getenv("PORT", 8001)
 
     if transport in ("sse", "streamable-http"):
-        mcp.run(transport=transport)
+        mcp.run(transport=transport,
+                host = "0.0.0.0",
+                port = port        
+        )
     else:
-        mcp.run(transport="stdio")
+        mcp.run(transport="stdio",
+                host = "0.0.0.0",
+                port = port        
+        )

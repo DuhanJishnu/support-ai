@@ -4,6 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
+from app.api.mcp_tools import router as mcp_router
+from app.api.mcp_tools import initialize_mcp_client
 from app.config import settings
 from app.exceptions import register_exception_handlers
 from app.logging_config import setup_logging
@@ -42,6 +44,17 @@ def create_app() -> FastAPI:
 
     # Include routers
     application.include_router(health_router)
+    application.include_router(mcp_router)
+
+    # Startup event to initialize MCP client
+    @application.on_event("startup")
+    async def startup_event():
+        """Initialize MCP client on application startup."""
+        await initialize_mcp_client(
+            telemetry_url=settings.MCP_TELEMETRY_SERVER_URL,
+            billing_url=settings.MCP_BILLING_SERVER_URL,
+            timeout=settings.MCP_REQUEST_TIMEOUT,
+        )
 
     return application
 
