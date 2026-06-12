@@ -1,4 +1,4 @@
-# Support AI — Multi-Agent Customer Support Platform
+# AssistFlow — Multi-Agent Customer Support Platform
 
 A production-grade, multi-agent customer support platform built with **FastAPI**, **Next.js**, **LangGraph**, and the **Model Context Protocol (MCP)**.
 
