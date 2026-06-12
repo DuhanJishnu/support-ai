@@ -110,15 +110,10 @@ class TestMCPClientManager:
         client = mcp_context(tools=[mock_tool])
 
         with patch("app.mcp_client.Client", return_value=client):
-            await mcp_client._discover_tools_from_server(
-                "test", "http://test:8000/sse"
-            )
+            await mcp_client._discover_tools_from_server("test", "http://test:8000/sse")
 
             assert "test_tool" in mcp_client._tools_registry
-            assert (
-                mcp_client._tools_registry["test_tool"][0]
-                == "http://test:8000/sse"
-            )
+            assert mcp_client._tools_registry["test_tool"][0] == "http://test:8000/sse"
 
     @pytest.mark.asyncio
     async def test_discover_tools_server_failure(self, mcp_client):
@@ -126,9 +121,7 @@ class TestMCPClientManager:
         client = mcp_context(enter_error=Exception("Connection failed"))
 
         with patch("app.mcp_client.Client", return_value=client):
-            await mcp_client._discover_tools_from_server(
-                "test", "http://test:8000/sse"
-            )
+            await mcp_client._discover_tools_from_server("test", "http://test:8000/sse")
 
             assert len(mcp_client._tools_registry) == 0
 
@@ -144,14 +137,10 @@ class TestMCPClientManager:
         client = mcp_context(result=SimpleNamespace(data=mock_result))
 
         with patch("app.mcp_client.Client", return_value=client):
-            result = await mcp_client.invoke_tool(
-                "test_tool", {"arg": "value"}
-            )
+            result = await mcp_client.invoke_tool("test_tool", {"arg": "value"})
 
             assert result == {"data": mock_result}
-            client.call_tool.assert_awaited_once_with(
-                "test_tool", {"arg": "value"}
-            )
+            client.call_tool.assert_awaited_once_with("test_tool", {"arg": "value"})
 
     @pytest.mark.asyncio
     async def test_invoke_tool_not_found(self, mcp_client):

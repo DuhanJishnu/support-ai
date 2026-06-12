@@ -14,9 +14,7 @@ _mcp_client: MCPClientManager | None = None
 def get_mcp_client() -> MCPClientManager:
     """Dependency to get the MCP client manager instance."""
     if _mcp_client is None:
-        raise HTTPException(
-            status_code=503, detail="MCP client not initialized"
-        )
+        raise HTTPException(status_code=503, detail="MCP client not initialized")
     return _mcp_client
 
 
@@ -90,9 +88,7 @@ async def invoke_tool(
         HTTPException: If tool is not found or execution fails.
     """
     try:
-        result = await mcp_client.invoke_tool(
-            request.tool_name, request.input
-        )
+        result = await mcp_client.invoke_tool(request.tool_name, request.input)
         return {"success": True, "result": result}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e

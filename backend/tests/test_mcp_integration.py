@@ -26,6 +26,7 @@ class TestMCPToolsAPI:
     def test_list_tools_uninitialized(self):
         """Test listing tools when MCP client is not initialized."""
         from app.api import mcp_tools
+
         mcp_tools._mcp_client = None
 
         app = create_app()
@@ -67,16 +68,13 @@ class TestMCPToolsAPI:
             data = response.json()
             assert len(data["tools"]) == 2
             assert data["total"] == 2
-            assert any(
-                t["name"] == "get_ride_route_deviation" for t in data["tools"]
-            )
-            assert any(
-                t["name"] == "verify_transaction_status" for t in data["tools"]
-            )
+            assert any(t["name"] == "get_ride_route_deviation" for t in data["tools"])
+            assert any(t["name"] == "verify_transaction_status" for t in data["tools"])
 
     def test_mcp_health_not_initialized(self):
         """Test health check when MCP is not initialized."""
         from app.api import mcp_tools
+
         mcp_tools._mcp_client = None
 
         app = create_app()
@@ -124,9 +122,7 @@ class TestMCPToolsAPI:
     def test_invoke_tool_internal_error(self):
         """Test handling of internal error during tool invocation."""
         mock_client = MagicMock()
-        mock_client.invoke_tool.side_effect = Exception(
-            "Server connection failed"
-        )
+        mock_client.invoke_tool.side_effect = Exception("Server connection failed")
 
         with patch("app.api.mcp_tools._mcp_client", mock_client):
             app = create_app()
