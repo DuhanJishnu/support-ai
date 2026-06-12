@@ -29,6 +29,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      telemetry:
+        condition: service_started
+      billing:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
