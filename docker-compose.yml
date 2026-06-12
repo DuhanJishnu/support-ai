@@ -46,5 +46,23 @@ services:
       - backend
     restart: unless-stopped
 
+  telemetry:
+    build: ./mcp-servers/telemetry
+    ports:
+      - "8001:8001"
+    environment:
+      - MCP_TRANSPORT=sse
+      - PORT=8001
+    restart: unless-stopped
+
+  billing:
+    build: ./mcp-servers/billing
+    ports:
+      - "8002:8002"
+    environment:
+      - MCP_TRANSPORT=sse
+      - PORT=8002
+    restart: unless-stopped
+
 volumes:
   postgres_data:

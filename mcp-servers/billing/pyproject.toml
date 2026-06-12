@@ -1,0 +1,8 @@
+[project]
+name = "mcp-billing"
+version = "0.1.0"
+description = "MCP Billing Server"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp",
+]
