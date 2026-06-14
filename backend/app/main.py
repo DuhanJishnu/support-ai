@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.agents import router as agents_router
 from app.api.health import router as health_router
 from app.api.mcp_tools import initialize_mcp_client, router as mcp_router
 from app.config import settings
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     # Include routers
     application.include_router(health_router)
     application.include_router(mcp_router)
+    application.include_router(agents_router)
 
     # Startup event to initialize MCP client
     @application.on_event("startup")
