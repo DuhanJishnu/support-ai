@@ -50,7 +50,7 @@ def generic_llm_node(state: AgentState | dict[str, Any]) -> AgentState:
     intent = agent_state.gathered_context.get("intent", "GENERAL")
     urgency = agent_state.gathered_context.get("urgency", 1)
 
-    logger.info(f"GenericLLM: handling request", intent=intent, urgency=urgency)
+    logger.info("GenericLLM: handling request", intent=intent, urgency=urgency)
 
     response = AIMessage(
         content=(
