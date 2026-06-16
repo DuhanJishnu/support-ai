@@ -2,42 +2,47 @@
 
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 
+from app.agents.nodes.router import route_after_router, router_node
+from app.agents.nodes.stubs import (
+    billing_agent_node,
+    general_agent_node,
+    telemetry_agent_node,
+)
 from app.agents.state import AgentState, coerce_agent_state
 
 
-def generic_llm_node(state: AgentState | dict[str, Any]) -> AgentState:
-    """Initial deterministic node used to prove the graph flow."""
-    agent_state = coerce_agent_state(state)
-    response = AIMessage(
-        content=(
-            "Support agent graph initialized. Ready to route the conversation "
-            "once specialized agents are connected."
-        )
-    )
-
-    return agent_state.model_copy(
-        update={
-            "messages": [*agent_state.messages, response],
-            "current_node": "generic_llm",
-            "resolution_status": "in_progress",
-            "gathered_context": {
-                **agent_state.gathered_context,
-                "graph": "support_agent_v1",
-                "last_node": "generic_llm",
-            },
-        }
-    )
-
-
 def build_support_graph():
-    """Build and compile the initial support-agent LangGraph."""
+    """Build and compile the support-agent LangGraph with router and sub-agent stubs."""
     graph = StateGraph(AgentState)
-    graph.add_node("generic_llm", generic_llm_node)
-    graph.set_entry_point("generic_llm")
-    graph.add_edge("generic_llm", END)
+
+    # --- Nodes ---
+    graph.add_node("router", router_node)
+    graph.add_node("billing_agent", billing_agent_node)
+    graph.add_node("telemetry_agent", telemetry_agent_node)
+    graph.add_node("general_agent", general_agent_node)
+
+    # --- Entry point ---
+    graph.set_entry_point("router")
+
+    # --- Conditional edges from router ---
+    graph.add_conditional_edges(
+        "router",
+        route_after_router,
+        {
+            "billing_agent": "billing_agent",
+            "telemetry_agent": "telemetry_agent",
+            "general_agent": "general_agent",
+        },
+    )
+
+    # --- All sub-agents terminate for now ---
+    graph.add_edge("billing_agent", END)
+    graph.add_edge("telemetry_agent", END)
+    graph.add_edge("general_agent", END)
+
     return graph.compile()
 
 

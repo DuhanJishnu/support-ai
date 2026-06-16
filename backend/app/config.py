@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     MCP_SERVER_URLS: list[str] = []
     MCP_REQUEST_TIMEOUT: float = 30.0
 
+    # LLM settings
+    GOOGLE_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
     @property
     def mcp_server_urls(self) -> list[str]:
         """Return configured MCP server URLs, preserving existing env vars."""
