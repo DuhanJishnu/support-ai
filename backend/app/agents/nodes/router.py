@@ -119,6 +119,6 @@ def route_after_router(state: AgentState | dict[str, Any]) -> str:
     routing_map = {
         "BILLING": "billing_agent",
         "SAFETY": "telemetry_agent",
-        "GENERAL": "general_agent",
+        "GENERAL": "generic_llm",
     }
-    return routing_map.get(intent, "general_agent")
+    return routing_map.get(intent, "generic_llm")

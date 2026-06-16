@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from app.agents.nodes.router import route_after_router, router_node
 from app.agents.nodes.stubs import (
     billing_agent_node,
-    general_agent_node,
+    generic_llm_node,
     telemetry_agent_node,
 )
 from app.agents.schemas import IntentClassification
@@ -163,15 +163,15 @@ class TestRouteAfterRouter:
 
     def test_routes_general_intent(self):
         state = make_state(extra_context={"intent": "GENERAL"})
-        assert route_after_router(state) == "general_agent"
+        assert route_after_router(state) == "generic_llm"
 
     def test_routes_unknown_intent_to_general(self):
         state = make_state(extra_context={"intent": "UNKNOWN"})
-        assert route_after_router(state) == "general_agent"
+        assert route_after_router(state) == "generic_llm"
 
     def test_routes_missing_intent_to_general(self):
         state = make_state()
-        assert route_after_router(state) == "general_agent"
+        assert route_after_router(state) == "generic_llm"
 
 
 # ---------------------------------------------------------------------------
@@ -201,9 +201,9 @@ class TestStubNodes:
 
     def test_general_stub_appends_message(self):
         state = self._state_with_intent("GENERAL", urgency=1)
-        result = general_agent_node(state)
-        assert "GeneralAgent" in result.messages[-1].content
-        assert result.current_node == "generalagent"
+        result = generic_llm_node(state)
+        assert "GenericLLM" in result.messages[-1].content
+        assert result.current_node == "generic_llm"
 
 
 # ---------------------------------------------------------------------------
@@ -251,4 +251,4 @@ class TestFullGraph:
         result = run_support_graph("How do I update my payment method?")
 
         assert result.gathered_context["intent"] == "GENERAL"
-        assert result.current_node == "generalagent"
+        assert result.current_node == "generic_llm"
