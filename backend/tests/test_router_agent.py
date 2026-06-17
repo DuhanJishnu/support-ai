@@ -211,8 +211,7 @@ class TestToolAgentNodes:
         assert result.current_node == "billing_agent"
         assert result.gathered_context["last_tool_call"]["status"] == "succeeded"
         assert (
-            result.gathered_context["billing"]["result"]["data"]["status"]
-            == "SUCCESS"
+            result.gathered_context["billing"]["result"]["data"]["status"] == "SUCCESS"
         )
 
     @patch("app.agents.nodes.stubs._invoke_mcp_tool")
@@ -234,9 +233,10 @@ class TestToolAgentNodes:
         assert "TelemetryAgent" in result.messages[-1].content
         assert result.current_node == "telemetry_agent"
         assert result.gathered_context["last_tool_call"]["status"] == "succeeded"
-        assert result.gathered_context["telemetry"]["result"]["data"][
-            "deviation_score"
-        ] == 0.85
+        assert (
+            result.gathered_context["telemetry"]["result"]["data"]["deviation_score"]
+            == 0.85
+        )
 
     @patch("app.agents.nodes.stubs._invoke_mcp_tool")
     def test_tool_agent_records_failed_tool_call(self, mock_invoke_tool):
@@ -247,9 +247,10 @@ class TestToolAgentNodes:
 
         assert result.current_node == "billing_agent"
         assert result.gathered_context["last_tool_call"]["status"] == "failed"
-        assert "MCP client is not initialized" in result.gathered_context["billing"][
-            "result"
-        ]["error"]
+        assert (
+            "MCP client is not initialized"
+            in result.gathered_context["billing"]["result"]["error"]
+        )
 
     def test_general_stub_appends_message(self):
         state = self._state_with_intent("GENERAL", urgency=1)
