@@ -70,7 +70,11 @@ class TestIntentClassification:
 
     def test_invalid_intent_fails(self):
         with pytest.raises(ValidationError):
-            IntentClassification(intent="UNKNOWN", urgency=2, reasoning="test")  # type: ignore
+            IntentClassification(
+                intent="UNKNOWN",
+                urgency=2,
+                reasoning="test",
+            )  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -175,29 +179,77 @@ class TestRouteAfterRouter:
 
 
 # ---------------------------------------------------------------------------
-# Stub Agent Node Tests
+# Tool Agent Node Tests
 # ---------------------------------------------------------------------------
 
 
-class TestStubNodes:
+class TestToolAgentNodes:
     def _state_with_intent(self, intent: str, urgency: int = 2) -> AgentState:
         return make_state(
             extra_context={"intent": intent, "urgency": urgency},
         )
 
-    def test_billing_stub_appends_message(self):
-        state = self._state_with_intent("BILLING", urgency=3)
+    @patch("app.agents.nodes.stubs._invoke_mcp_tool")
+    def test_billing_agent_invokes_transaction_tool(self, mock_invoke_tool):
+        mock_invoke_tool.return_value = {
+            "data": {"transaction_id": "txn_123", "status": "SUCCESS"}
+        }
+        state = make_state(
+            "Please check transaction_id txn_123",
+            {"intent": "BILLING", "urgency": 3},
+        )
+
         result = billing_agent_node(state)
-        assert len(result.messages) == 2  # HumanMessage + AIMessage stub
+
+        mock_invoke_tool.assert_called_once_with(
+            "verify_transaction_status",
+            {"transaction_id": "txn_123"},
+        )
+        assert len(result.messages) == 2
         assert isinstance(result.messages[-1], AIMessage)
         assert "BillingAgent" in result.messages[-1].content
-        assert result.current_node == "billingagent"
+        assert result.current_node == "billing_agent"
+        assert result.gathered_context["last_tool_call"]["status"] == "succeeded"
+        assert (
+            result.gathered_context["billing"]["result"]["data"]["status"]
+            == "SUCCESS"
+        )
 
-    def test_telemetry_stub_appends_message(self):
-        state = self._state_with_intent("SAFETY", urgency=4)
+    @patch("app.agents.nodes.stubs._invoke_mcp_tool")
+    def test_telemetry_agent_invokes_route_tool(self, mock_invoke_tool):
+        mock_invoke_tool.return_value = {
+            "data": {"ride_id": "ride_456", "deviation_score": 0.85}
+        }
+        state = make_state(
+            "Driver went off route on ride_id ride_456",
+            {"intent": "SAFETY", "urgency": 4},
+        )
+
         result = telemetry_agent_node(state)
+
+        mock_invoke_tool.assert_called_once_with(
+            "get_ride_route_deviation",
+            {"ride_id": "ride_456"},
+        )
         assert "TelemetryAgent" in result.messages[-1].content
-        assert result.current_node == "telemetryagent"
+        assert result.current_node == "telemetry_agent"
+        assert result.gathered_context["last_tool_call"]["status"] == "succeeded"
+        assert result.gathered_context["telemetry"]["result"]["data"][
+            "deviation_score"
+        ] == 0.85
+
+    @patch("app.agents.nodes.stubs._invoke_mcp_tool")
+    def test_tool_agent_records_failed_tool_call(self, mock_invoke_tool):
+        mock_invoke_tool.side_effect = RuntimeError("MCP client is not initialized")
+        state = self._state_with_intent("BILLING", urgency=3)
+
+        result = billing_agent_node(state)
+
+        assert result.current_node == "billing_agent"
+        assert result.gathered_context["last_tool_call"]["status"] == "failed"
+        assert "MCP client is not initialized" in result.gathered_context["billing"][
+            "result"
+        ]["error"]
 
     def test_general_stub_appends_message(self):
         state = self._state_with_intent("GENERAL", urgency=1)
@@ -223,9 +275,12 @@ class TestFullGraph:
         result = run_support_graph("I was charged twice for my last ride.")
 
         assert result.gathered_context["intent"] == "BILLING"
-        assert result.current_node == "billingagent"
+        assert result.current_node == "billing_agent"
         assert result.resolution_status == "in_progress"
         assert len(result.messages) == 2
+        assert result.gathered_context["last_tool_call"]["tool_name"] == (
+            "verify_transaction_status"
+        )
 
     @patch("app.agents.nodes.router.get_router_llm")
     def test_safety_flow_end_to_end(self, mock_get_llm):
@@ -238,7 +293,10 @@ class TestFullGraph:
         result = run_support_graph("My driver is taking a very strange route!")
 
         assert result.gathered_context["intent"] == "SAFETY"
-        assert result.current_node == "telemetryagent"
+        assert result.current_node == "telemetry_agent"
+        assert result.gathered_context["last_tool_call"]["tool_name"] == (
+            "get_ride_route_deviation"
+        )
 
     @patch("app.agents.nodes.router.get_router_llm")
     def test_general_flow_end_to_end(self, mock_get_llm):
