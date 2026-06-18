@@ -17,6 +17,9 @@ export type AgentStreamEvent = {
 type StreamRequest = {
   message: string;
   gathered_context?: Record<string, unknown>;
+  conversation_id?: string;
+  previous_messages?: Array<{ type: string; content: string }>;
+  extracted_entities?: Record<string, unknown>;
 };
 
 const API_BASE_URL =
@@ -68,6 +71,30 @@ export function useAgentStream() {
     [events]
   );
 
+  const doneData = useMemo(() => {
+    const doneEvent = [...events]
+      .reverse()
+      .find((event) => event.type === 'done');
+    if (!doneEvent) return null;
+    return {
+      conversation_id: doneEvent.data.conversation_id as string | undefined,
+      extracted_entities: doneEvent.data.extracted_entities as
+        | Record<string, unknown>
+        | undefined,
+      gathered_context: doneEvent.data.gathered_context as
+        | Record<string, unknown>
+        | undefined,
+      resolution: doneEvent.data.resolution as
+        | Record<string, unknown>
+        | undefined,
+      resolution_status: doneEvent.data.resolution_status as
+        | string
+        | undefined,
+      response: doneEvent.data.response as string | undefined,
+      raw: doneEvent.data,
+    };
+  }, [events]);
+
   const startStream = useCallback(async (request: StreamRequest) => {
     setEvents([]);
     setError(null);
@@ -83,6 +110,9 @@ export function useAgentStream() {
         body: JSON.stringify({
           message: request.message,
           gathered_context: request.gathered_context ?? {},
+          conversation_id: request.conversation_id,
+          previous_messages: request.previous_messages,
+          extracted_entities: request.extracted_entities,
         }),
       });
 
@@ -131,6 +161,7 @@ export function useAgentStream() {
   }, []);
 
   return {
+    doneData,
     error,
     events,
     isStreaming,
