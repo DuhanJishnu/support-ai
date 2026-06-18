@@ -20,15 +20,12 @@ type StreamRequest = {
 };
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? 'http://localhost:8000';
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ??
+  'http://localhost:8000';
 
 function parseSseFrame(frame: string): Omit<AgentStreamEvent, 'id'> | null {
-  const eventLine = frame
-    .split('\n')
-    .find((line) => line.startsWith('event:'));
-  const dataLine = frame
-    .split('\n')
-    .find((line) => line.startsWith('data:'));
+  const eventLine = frame.split('\n').find((line) => line.startsWith('event:'));
+  const dataLine = frame.split('\n').find((line) => line.startsWith('data:'));
 
   if (!eventLine || !dataLine) {
     return null;
@@ -37,7 +34,9 @@ function parseSseFrame(frame: string): Omit<AgentStreamEvent, 'id'> | null {
   const type = eventLine.replace('event:', '').trim() as AgentStreamEventType;
   const rawData = dataLine.replace('data:', '').trim();
 
-  if (!['token', 'agent_status_change', 'tool_invocation', 'done'].includes(type)) {
+  if (
+    !['token', 'agent_status_change', 'tool_invocation', 'done'].includes(type)
+  ) {
     return null;
   }
 
@@ -57,7 +56,7 @@ export function useAgentStream() {
       [...events]
         .reverse()
         .find((event) => event.type === 'agent_status_change')?.data,
-    [events],
+    [events]
   );
 
   const tokenText = useMemo(
@@ -66,7 +65,7 @@ export function useAgentStream() {
         .filter((event) => event.type === 'token')
         .map((event) => String(event.data.content ?? ''))
         .join('\n'),
-    [events],
+    [events]
   );
 
   const startStream = useCallback(async (request: StreamRequest) => {
@@ -124,7 +123,7 @@ export function useAgentStream() {
       setError(
         streamError instanceof Error
           ? streamError.message
-          : 'Agent stream failed.',
+          : 'Agent stream failed.'
       );
     } finally {
       setIsStreaming(false);

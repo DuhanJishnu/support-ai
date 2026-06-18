@@ -148,7 +148,9 @@ function getRecord(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
-function getToolData(result?: Record<string, unknown>): Record<string, unknown> {
+function getToolData(
+  result?: Record<string, unknown>
+): Record<string, unknown> {
   const data = getRecord(result?.data);
   return data ?? result ?? {};
 }
@@ -158,13 +160,13 @@ function summarizeToolCall(call: ToolCall) {
 
   if (call.tool === 'verify_transaction_status') {
     return `${String(data.transaction_id ?? 'transaction')} returned ${String(
-      data.status ?? call.status,
+      data.status ?? call.status
     )}`;
   }
 
   if (call.tool === 'get_ride_route_deviation') {
     return `${String(data.ride_id ?? 'ride')} deviation score ${String(
-      data.deviation_score ?? 'pending',
+      data.deviation_score ?? 'pending'
     )}`;
   }
 
@@ -215,7 +217,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
           </h3>
           <span
             className={`rounded-lg border px-2 py-1 text-xs font-semibold ${statusClasses(
-              call.status,
+              call.status
             )}`}
           >
             {String(data.status ?? call.status)}
@@ -226,7 +228,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
             <dt className="text-xs font-medium text-zinc-500">Transaction</dt>
             <dd className="mt-1 font-semibold text-zinc-950">
               {String(
-                data.transaction_id ?? call.input?.transaction_id ?? 'n/a',
+                data.transaction_id ?? call.input?.transaction_id ?? 'n/a'
               )}
             </dd>
           </div>
@@ -243,7 +245,9 @@ function ToolEvidence({ call }: { call: ToolCall }) {
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-zinc-500">Decision Input</dt>
+            <dt className="text-xs font-medium text-zinc-500">
+              Decision Input
+            </dt>
             <dd className="mt-1 font-semibold text-zinc-950">
               Refund policy check
             </dd>
@@ -265,7 +269,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
           </h3>
           <span
             className={`rounded-lg border px-2 py-1 text-xs font-semibold ${statusClasses(
-              call.status,
+              call.status
             )}`}
           >
             {String(data.status ?? call.status)}
@@ -283,7 +287,9 @@ function ToolEvidence({ call }: { call: ToolCall }) {
           </div>
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="font-medium text-zinc-600">Deviation score</span>
-            <span className="font-semibold text-zinc-950">{score.toFixed(2)}</span>
+            <span className="font-semibold text-zinc-950">
+              {score.toFixed(2)}
+            </span>
           </div>
         </div>
         <p className="mt-3 text-sm leading-5 text-zinc-600">
@@ -340,16 +346,20 @@ function AgentActivity({
           />
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-zinc-950">{step.label}</p>
+              <p className="text-sm font-semibold text-zinc-950">
+                {step.label}
+              </p>
               <span
                 className={`rounded-lg border px-2 py-0.5 text-xs font-semibold ${statusClasses(
-                  step.status as AgentStatus,
+                  step.status as AgentStatus
                 )}`}
               >
                 {step.status}
               </span>
             </div>
-            <p className="mt-1 text-sm leading-5 text-zinc-600">{step.detail}</p>
+            <p className="mt-1 text-sm leading-5 text-zinc-600">
+              {step.detail}
+            </p>
           </div>
         </div>
       ))}
@@ -361,14 +371,8 @@ export default function Home() {
   const [messages, setMessages] = useState(initialMessages);
   const [toolCalls, setToolCalls] = useState(initialToolCalls);
   const [draft, setDraft] = useState('');
-  const {
-    error,
-    events,
-    isStreaming,
-    latestStatus,
-    startStream,
-    tokenText,
-  } = useAgentStream();
+  const { error, events, isStreaming, latestStatus, startStream, tokenText } =
+    useAgentStream();
 
   const activeTicket = tickets[0];
   const streamedToolCalls: ToolCall[] = useMemo(
@@ -383,15 +387,17 @@ export default function Home() {
           input: getRecord(event.data.input) ?? undefined,
           result: getRecord(event.data.result) ?? undefined,
         })),
-    [events],
+    [events]
   );
-  const doneEvent = [...events].reverse().find((event) => event.type === 'done');
+  const doneEvent = [...events]
+    .reverse()
+    .find((event) => event.type === 'done');
   const liveContext =
     (doneEvent?.data.gathered_context as Record<string, unknown> | undefined) ??
     contextSnapshot;
   const jsonContext = useMemo(
     () => JSON.stringify(liveContext, null, 2),
-    [liveContext],
+    [liveContext]
   );
   const visibleToolCalls = [...streamedToolCalls, ...toolCalls];
   const streamedEvidence = streamedToolCalls.filter((call) => call.result);
@@ -538,7 +544,7 @@ export default function Home() {
                         <span>AssistFlow Stream</span>
                         <span>{isStreaming ? 'live' : 'done'}</span>
                       </div>
-                      <p className="whitespace-pre-line text-sm leading-6 text-zinc-800">
+                      <p className="text-sm leading-6 whitespace-pre-line text-zinc-800">
                         {error ?? tokenText}
                       </p>
                       {evidenceToolCalls.map((call) => (
@@ -571,7 +577,7 @@ export default function Home() {
                   </label>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <textarea
-                      className="min-h-20 flex-1 resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm leading-6 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                      className="min-h-20 flex-1 resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm leading-6 transition outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                       id="message"
                       onChange={(event) => setDraft(event.target.value)}
                       placeholder="Type a customer update or internal note..."
@@ -653,7 +659,7 @@ export default function Home() {
                       </h3>
                       <span
                         className={`rounded-lg border px-2 py-1 text-xs font-semibold ${statusClasses(
-                          call.status,
+                          call.status
                         )}`}
                       >
                         {call.status}
