@@ -19,8 +19,24 @@ class Settings(BaseSettings):
     MCP_REQUEST_TIMEOUT: float = 30.0
 
     # LLM settings
-    GOOGLE_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GOOGLE_API_KEY_DEFAULT: str = (
+        ""
+    )
+    GOOGLE_API_KEY: str = GOOGLE_API_KEY_DEFAULT
+    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
+
+    # Ollama settings
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "gemma4:12b"
+    USE_OLLAMA: bool = True
+
+    @property
+    def is_gemini_available(self) -> bool:
+        """Check if a non-default Gemini API key is provided."""
+        return bool(
+            self.GOOGLE_API_KEY
+            and self.GOOGLE_API_KEY != self.GOOGLE_API_KEY_DEFAULT
+        )
 
     @property
     def mcp_server_urls(self) -> list[str]:
