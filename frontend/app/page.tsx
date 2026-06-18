@@ -2,6 +2,8 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { useAgentStream } from './hooks/useAgentStream';
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type AgentStatus =
   | 'resolved'
@@ -28,54 +30,6 @@ type ToolCall = {
   result?: Record<string, unknown>;
 };
 
-const initialMessages: ChatMessage[] = [
-  {
-    id: 1,
-    author: 'customer',
-    body: 'I was charged twice for transaction_id txn_123 after my airport ride.',
-    time: '09:41',
-  },
-  {
-    id: 2,
-    author: 'agent',
-    body:
-      'I found a billing intent, checked the transaction record, and queued ' +
-      'the refund policy validation.',
-    time: '09:42',
-  },
-];
-
-const initialToolCalls: ToolCall[] = [
-  {
-    id: 'router',
-    tool: 'RouterAgent',
-    status: 'resolved',
-    detail: 'Intent BILLING, urgency 3',
-  },
-  {
-    id: 'billing',
-    tool: 'verify_transaction_status',
-    status: 'resolved',
-    detail: 'txn_123 returned SUCCESS for $25.50',
-    input: { transaction_id: 'txn_123' },
-    result: {
-      data: {
-        transaction_id: 'txn_123',
-        status: 'SUCCESS',
-        amount: 25.5,
-        currency: 'USD',
-        payment_method: 'Credit Card',
-      },
-    },
-  },
-  {
-    id: 'guardrail',
-    tool: 'GuardrailNode',
-    status: 'review',
-    detail: 'Refund under policy limit',
-  },
-];
-
 const tickets = [
   {
     id: 'TCK-1048',
@@ -99,30 +53,6 @@ const tickets = [
     urgency: 1,
   },
 ];
-
-const contextSnapshot = {
-  intent: 'BILLING',
-  urgency: 3,
-  current_node: 'guardrail',
-  billing: {
-    tool: 'verify_transaction_status',
-    input: { transaction_id: 'txn_123' },
-    result: {
-      data: {
-        transaction_id: 'txn_123',
-        status: 'SUCCESS',
-        amount: 25.5,
-        currency: 'USD',
-        payment_method: 'Credit Card',
-      },
-    },
-  },
-  resolution: {
-    action: 'ISSUE_REFUND',
-    amount: 12.5,
-    reason: 'Duplicate charge detected.',
-  },
-};
 
 function statusClasses(status: AgentStatus) {
   if (status === 'resolved' || status === 'succeeded') {
@@ -153,6 +83,22 @@ function getToolData(
 ): Record<string, unknown> {
   const data = getRecord(result?.data);
   return data ?? result ?? {};
+}
+
+function ThinkingDots() {
+  const delays = ["0s", "0.2s", "0.4s"];
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {delays.map((delay) => (
+        <span
+          key={delay}
+          className="h-2 w-2 rounded-full bg-linear-to-br from-cyan-300 to-cyan-500 animate-thinking-wave shadow-lg shadow-cyan-500/40"
+          style={{ animationDelay: delay }}
+        />
+      ))}
+    </div>
+  );
 }
 
 function summarizeToolCall(call: ToolCall) {
@@ -210,11 +156,14 @@ function ToolEvidence({ call }: { call: ToolCall }) {
 
   if (call.tool === 'verify_transaction_status') {
     return (
-      <section className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-zinc-950">
-            Transaction Evidence
-          </h3>
+      <section className="mt-3 rounded-lg border border-zinc-200 border-l-4 border-l-emerald-500 bg-white p-3 shadow-sm transition-all hover:shadow-md">
+        <div className="mb-3 flex items-center justify-between gap-3 border-b border-zinc-100 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+            <h3 className="text-sm font-semibold text-zinc-950">
+              Billing Verification
+            </h3>
+          </div>
           <span
             className={`rounded-lg border px-2 py-1 text-xs font-semibold ${statusClasses(
               call.status
@@ -223,36 +172,54 @@ function ToolEvidence({ call }: { call: ToolCall }) {
             {String(data.status ?? call.status)}
           </span>
         </div>
-        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-xs font-medium text-zinc-500">Transaction</dt>
-            <dd className="mt-1 font-semibold text-zinc-950">
-              {String(
-                data.transaction_id ?? call.input?.transaction_id ?? 'n/a'
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-zinc-500">Amount</dt>
-            <dd className="mt-1 font-semibold text-zinc-950">
-              {String(data.currency ?? 'USD')} {String(data.amount ?? '0.00')}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-zinc-500">Method</dt>
-            <dd className="mt-1 font-semibold text-zinc-950">
-              {String(data.payment_method ?? 'Unknown')}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-zinc-500">
-              Decision Input
-            </dt>
-            <dd className="mt-1 font-semibold text-zinc-950">
-              Refund policy check
-            </dd>
-          </div>
-        </dl>
+        <div className="rounded-md border border-zinc-100 bg-zinc-50 p-3">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            <div>
+              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+                Transaction ID
+              </dt>
+              <dd className="mt-0.5 font-mono text-xs font-semibold text-zinc-950">
+                {String(
+                  data.transaction_id ?? call.input?.transaction_id ?? 'n/a'
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+                Amount
+              </dt>
+              <dd className="mt-0.5 font-bold text-zinc-950">
+                {String(data.currency ?? 'USD')} {String(data.amount ?? '0.00')}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+                Payment Method
+              </dt>
+              <dd className="mt-0.5 font-semibold italic text-zinc-700">
+                {String(data.payment_method ?? 'Unknown')}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+                Gateway Resp
+              </dt>
+              <dd
+                className={`mt-0.5 font-bold ${
+                  data.status === 'SUCCESS'
+                    ? 'text-emerald-600'
+                    : 'text-rose-600'
+                }`}
+              >
+                {String(data.status ?? 'PENDING')}
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div className="mt-3 flex w-fit items-center gap-2 rounded border border-zinc-100 bg-white px-2 py-1 text-[10px] text-zinc-400">
+          <div className="h-1.5 w-1.5 rounded-full bg-zinc-300" />
+          <span>Authenticated via Billing MCP</span>
+        </div>
       </section>
     );
   }
@@ -262,11 +229,14 @@ function ToolEvidence({ call }: { call: ToolCall }) {
     const percent = Math.min(Math.max(score, 0), 1) * 100;
 
     return (
-      <section className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-zinc-950">
-            Route Telemetry
-          </h3>
+      <section className="mt-3 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition-all hover:shadow-md">
+        <div className="mb-3 flex items-center justify-between gap-3 border-b border-zinc-100 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-cyan-500" />
+            <h3 className="text-sm font-semibold text-zinc-950">
+              Route Telemetry Analysis
+            </h3>
+          </div>
           <span
             className={`rounded-lg border px-2 py-1 text-xs font-semibold ${statusClasses(
               call.status
@@ -275,25 +245,63 @@ function ToolEvidence({ call }: { call: ToolCall }) {
             {String(data.status ?? call.status)}
           </span>
         </div>
-        <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-          <div className="relative h-24 overflow-hidden rounded-md bg-white">
-            <div className="absolute top-1/2 left-4 h-1 w-[78%] -translate-y-1/2 bg-zinc-300" />
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+          <div className="relative h-24 overflow-hidden rounded-md border border-zinc-100 bg-white shadow-inner">
             <div
-              className="absolute top-[55%] left-4 h-1 rounded-full bg-cyan-500"
+              className="absolute inset-0 opacity-5"
+              style={{
+                backgroundImage: 'radial-gradient(#000 1px, transparent 1px)',
+                backgroundSize: '20px 20px',
+              }}
+            />
+            <div className="absolute top-1/2 left-4 h-1 w-[78%] -translate-y-1/2 bg-zinc-200" />
+            <div
+              className="absolute top-[52%] left-4 h-1.5 rounded-full bg-cyan-500/30 transition-all duration-1000"
               style={{ width: `${Math.max(percent, 12)}%` }}
             />
-            <div className="absolute top-5 left-4 h-3 w-3 rounded-full bg-emerald-500" />
-            <div className="absolute right-5 bottom-5 h-3 w-3 rounded-full bg-rose-500" />
+            <div className="absolute top-5 left-4 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-sm">
+              <span className="text-white text-[8px] font-bold">A</span>
+            </div>
+            <div className="absolute right-5 bottom-5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-rose-500 shadow-sm">
+              <span className="text-white text-[8px] font-bold">B</span>
+            </div>
+            {score > 0.3 && (
+              <div className="absolute top-[45%] left-1/3 h-6 w-1 animate-pulse rotate-45 rounded-full bg-amber-400" />
+            )}
           </div>
           <div className="mt-3 flex items-center justify-between text-sm">
-            <span className="font-medium text-zinc-600">Deviation score</span>
-            <span className="font-semibold text-zinc-950">
-              {score.toFixed(2)}
+            <span className="font-medium text-zinc-600">
+              GPS Deviation Score
+            </span>
+            <span
+              className={`font-bold ${
+                score > 0.5 ? 'text-rose-600' : 'text-emerald-600'
+              }`}
+            >
+              {(score * 100).toFixed(1)}%
             </span>
           </div>
         </div>
-        <p className="mt-3 text-sm leading-5 text-zinc-600">
-          {String(data.details ?? 'Route data is ready for review.')}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded border border-zinc-100 bg-zinc-50 p-2 text-center">
+            <p className="text-[10px] font-bold uppercase text-zinc-400">
+              Ride ID
+            </p>
+            <p className="truncate text-xs font-semibold text-zinc-700">
+              {String(data.ride_id ?? 'n/a')}
+            </p>
+          </div>
+          <div className="rounded border border-zinc-100 bg-zinc-50 p-2 text-center">
+            <p className="text-[10px] font-bold uppercase text-zinc-400">
+              Status
+            </p>
+            <p className="truncate text-xs font-semibold text-zinc-700">
+              {String(data.anomaly_type ?? 'Normal')}
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs leading-5 italic text-zinc-500">
+          {String(data.details ?? 'Route data processed via Telemetry MCP.')}
         </p>
       </section>
     );
@@ -302,31 +310,96 @@ function ToolEvidence({ call }: { call: ToolCall }) {
   return null;
 }
 
+const RESOLUTION_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
+  ISSUE_REFUND: { label: 'Refund Approved', color: 'emerald', icon: '✓' },
+  ESCALATE: { label: 'Escalated to Manager', color: 'rose', icon: '⬆' },
+  REVIEW_CASE: { label: 'Under Review', color: 'amber', icon: '⏳' },
+  NO_ACTION: { label: 'No Action Required', color: 'zinc', icon: '—' },
+};
+
+function ResolutionCard({ resolution, status }: {
+  resolution: Record<string, unknown>;
+  status: string;
+}) {
+  const action = String(resolution.action ?? 'NO_ACTION');
+  const amount = Number(resolution.amount ?? 0);
+  const reason = String(resolution.reason ?? '');
+  const config = RESOLUTION_CONFIG[action] ?? RESOLUTION_CONFIG.NO_ACTION;
+
+  const colorMap: Record<string, string> = {
+    emerald: 'border-emerald-300 bg-emerald-50/80',
+    rose: 'border-rose-300 bg-rose-50/80',
+    amber: 'border-amber-300 bg-amber-50/80',
+    zinc: 'border-zinc-300 bg-zinc-50/80',
+  };
+  const badgeMap: Record<string, string> = {
+    emerald: 'bg-emerald-100 text-emerald-800',
+    rose: 'bg-rose-100 text-rose-800',
+    amber: 'bg-amber-100 text-amber-800',
+    zinc: 'bg-zinc-100 text-zinc-800',
+  };
+
+  return (
+    <section className={`mt-3 rounded-lg border-2 p-4 transition-all ${colorMap[config.color]}`}>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{config.icon}</span>
+          <h3 className="text-sm font-bold text-zinc-950">Resolution Decision</h3>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-bold ${badgeMap[config.color]}`}>
+          {config.label}
+        </span>
+      </div>
+      {amount > 0 && (
+        <div className="mb-3 rounded-md bg-white/60 p-3 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Refund Amount</p>
+          <p className="mt-1 text-2xl font-bold text-zinc-950">${amount.toFixed(2)}</p>
+        </div>
+      )}
+      <p className="text-sm leading-relaxed text-zinc-700">{reason}</p>
+      <div className="mt-3 flex items-center gap-2 text-[10px] text-zinc-400">
+        <div className={`h-1.5 w-1.5 rounded-full ${status === 'resolved' ? 'bg-emerald-400' : status === 'needs_human' ? 'bg-rose-400' : 'bg-amber-400'}`} />
+        <span>Status: {status}</span>
+      </div>
+    </section>
+  );
+}
+
 function AgentActivity({
   isStreaming,
   latestStatus,
   toolCalls,
+  resolutionStatus,
 }: {
   isStreaming: boolean;
   latestStatus?: Record<string, unknown>;
   toolCalls: ToolCall[];
+  resolutionStatus: string;
 }) {
   const hasToolQuery = toolCalls.some((call) => call.status === 'querying');
+  const currentNode = String(latestStatus?.node ?? 'idle');
+
+  const finalStatus = isStreaming ? 'in_progress' : resolutionStatus;
+
   const steps = [
     {
       label: 'Thinking',
-      status: isStreaming ? 'in_progress' : 'resolved',
+      status:
+        isStreaming && currentNode === 'router' ? 'in_progress' : 'resolved',
       detail: 'Router is classifying the customer message.',
     },
     {
       label: 'Querying Database',
-      status: hasToolQuery ? 'querying' : 'resolved',
+      status: hasToolQuery ? 'querying' : (isStreaming ? 'in_progress' : 'resolved'),
       detail: 'Specialist agents call billing or telemetry MCP tools.',
     },
     {
       label: 'Policy Check',
-      status: String(latestStatus?.status ?? 'resolved') as AgentStatus,
-      detail: `Current node: ${String(latestStatus?.node ?? 'guardrail')}`,
+      status:
+        isStreaming && currentNode === 'guardrail'
+          ? 'querying'
+          : (finalStatus as AgentStatus),
+      detail: `Current node: ${currentNode}`,
     },
   ];
 
@@ -334,28 +407,40 @@ function AgentActivity({
     <div className="space-y-2">
       {steps.map((step) => (
         <div
-          className="flex items-start gap-3 rounded-lg border border-zinc-200 bg-white p-3"
+          className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+            step.status === 'in_progress' || step.status === 'querying'
+              ? 'border-cyan-200 bg-cyan-50/50'
+              : step.status === 'needs_human'
+                ? 'border-rose-200 bg-rose-50/50'
+                : 'border-zinc-200 bg-white'
+          }`}
           key={step.label}
         >
           <span
             className={`mt-1 h-2.5 w-2.5 rounded-full ${
               step.status === 'in_progress' || step.status === 'querying'
-                ? 'bg-cyan-500'
-                : 'bg-emerald-500'
+                ? 'animate-pulse-soft bg-cyan-500'
+                : step.status === 'needs_human'
+                  ? 'bg-rose-500'
+                  : 'bg-emerald-500'
             }`}
           />
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-1">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-semibold text-zinc-950">
                 {step.label}
               </p>
-              <span
-                className={`rounded-lg border px-2 py-0.5 text-xs font-semibold ${statusClasses(
-                  step.status as AgentStatus
-                )}`}
-              >
-                {step.status}
-              </span>
+              <div className="flex items-center gap-1.5">
+                {(step.status === 'in_progress' ||
+                  step.status === 'querying') && <ThinkingDots />}
+                <span
+                  className={`rounded-lg border px-2 py-0.5 text-xs font-semibold ${statusClasses(
+                    step.status as AgentStatus
+                  )}`}
+                >
+                  {step.status}
+                </span>
+              </div>
             </div>
             <p className="mt-1 text-sm leading-5 text-zinc-600">
               {step.detail}
@@ -367,14 +452,99 @@ function AgentActivity({
   );
 }
 
-export default function Home() {
-  const [messages, setMessages] = useState(initialMessages);
-  const [toolCalls, setToolCalls] = useState(initialToolCalls);
-  const [draft, setDraft] = useState('');
-  const { error, events, isStreaming, latestStatus, startStream, tokenText } =
-    useAgentStream();
+function LiveContextPanel({ context, status }: {
+  context: Record<string, unknown>;
+  status: string;
+}) {
+  const [showJson, setShowJson] = useState(false);
+  const intent = String(context.intent ?? '—');
+  const urgency = Number(context.urgency ?? 0);
+  const currentNode = String(context.current_node ?? context.last_node ?? '—');
+  const resolution = getRecord(context.resolution);
+  const jsonText = useMemo(() => JSON.stringify(context, null, 2), [context]);
 
-  const activeTicket = tickets[0];
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white">
+      <div className="border-b border-zinc-200 p-4">
+        <h2 className="text-base font-semibold text-zinc-950">Live Context</h2>
+      </div>
+      <div className="grid grid-cols-3 border-b border-zinc-200 text-center">
+        <div className="p-3">
+          <p className="text-[10px] font-bold uppercase text-zinc-400">Intent</p>
+          <p className="mt-1 text-sm font-bold text-zinc-950">{intent}</p>
+        </div>
+        <div className="border-x border-zinc-200 p-3">
+          <p className="text-[10px] font-bold uppercase text-zinc-400">Node</p>
+          <p className="mt-1 text-sm font-bold text-zinc-950 capitalize">{currentNode}</p>
+        </div>
+        <div className="p-3">
+          <p className="text-[10px] font-bold uppercase text-zinc-400">Urgency</p>
+          <p className={`mt-1 text-sm font-bold ${urgency >= 4 ? 'text-rose-600' : urgency >= 3 ? 'text-amber-600' : 'text-zinc-950'}`}>{urgency}/5</p>
+        </div>
+      </div>
+
+      {/* Resolution section */}
+      {resolution && (
+        <div className="border-b border-zinc-200 p-4">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-[10px] font-bold uppercase text-zinc-400">Resolution</p>
+            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${statusClasses(status as AgentStatus)}`}>
+              {status}
+            </span>
+          </div>
+          <div className="rounded-md bg-zinc-50 p-3 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-zinc-500">Action</span>
+              <span className="font-bold text-zinc-950">{String(resolution.action ?? '—')}</span>
+            </div>
+            {Number(resolution.amount ?? 0) > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-500">Amount</span>
+                <span className="font-bold text-emerald-700">${Number(resolution.amount).toFixed(2)}</span>
+              </div>
+            )}
+            <p className="text-xs leading-5 text-zinc-600 italic">{String(resolution.reason ?? '')}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Collapsible JSON */}
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={() => setShowJson(!showJson)}
+          className="flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-zinc-600 transition-colors"
+        >
+          <span className={`transition-transform ${showJson ? 'rotate-90' : ''}`}>▶</span>
+          Raw JSON
+        </button>
+        {showJson && (
+          <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-zinc-50 p-3 font-mono text-[11px] leading-5 text-zinc-600">
+            {jsonText}
+          </pre>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export default function Home() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  const [draft, setDraft] = useState('');
+  const [activeTicketId, setActiveTicketId] = useState(tickets[0].id);
+
+  // Multi-turn conversation state
+  const [conversationId, setConversationId] = useState('');
+  const [extractedEntities, setExtractedEntities] = useState<Record<string, unknown>>({});
+  const [messageHistory, setMessageHistory] = useState<Array<{ type: string; content: string }>>([]);
+
+  const { doneData, error, events, isStreaming, latestStatus, startStream, tokenText } =
+    useAgentStream();
+  const cleanText = tokenText.replace(/\n+/g, ' ');
+  const activeTicket =
+    tickets.find((t) => t.id === activeTicketId) || tickets[0];
+
   const streamedToolCalls: ToolCall[] = useMemo(
     () =>
       events
@@ -389,16 +559,16 @@ export default function Home() {
         })),
     [events]
   );
+
   const doneEvent = [...events]
     .reverse()
     .find((event) => event.type === 'done');
   const liveContext =
     (doneEvent?.data.gathered_context as Record<string, unknown> | undefined) ??
-    contextSnapshot;
-  const jsonContext = useMemo(
-    () => JSON.stringify(liveContext, null, 2),
-    [liveContext]
-  );
+    {};
+  const liveResolution = getRecord(liveContext.resolution);
+  const liveStatus = String(doneEvent?.data.resolution_status ?? '');
+
   const visibleToolCalls = [...streamedToolCalls, ...toolCalls];
   const streamedEvidence = streamedToolCalls.filter((call) => call.result);
   const evidenceToolCalls =
@@ -415,35 +585,70 @@ export default function Home() {
     }
 
     const nextId = messages.length + 1;
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setMessages((current) => [
       ...current,
       {
         id: nextId,
         author: 'customer',
         body: trimmed,
-        time: 'now',
-      },
-      {
-        id: nextId + 1,
-        author: 'agent',
-        body:
-          'RouterAgent is ready to classify this request and hand it to the ' +
-          'correct specialist.',
-        time: 'now',
+        time: now,
       },
     ]);
-    setToolCalls((current) => [
-      {
-        id: `pending-${nextId}`,
-        tool: 'RouterAgent',
-        status: 'querying',
-        detail: 'Awaiting backend classification',
-      },
-      ...current,
-    ]);
+    setToolCalls([]);
     setDraft('');
-    await startStream({ message: trimmed });
+
+    await startStream({
+      message: trimmed,
+      conversation_id: conversationId,
+      previous_messages: messageHistory,
+      extracted_entities: extractedEntities,
+    });
+
+    // After stream completes, update the conversation state from doneData
+    // (doneData updates reactively via useMemo, so we read it after stream)
   }
+
+  // Sync conversation state when doneData updates (stream completed)
+  const prevDoneRef = useMemo(() => doneData, [doneData]);
+  useMemo(() => {
+    if (!prevDoneRef || isStreaming) return;
+    // Update conversation ID
+    if (prevDoneRef.conversation_id) {
+      setConversationId(prevDoneRef.conversation_id);
+    }
+    // Update extracted entities
+    if (prevDoneRef.extracted_entities) {
+      setExtractedEntities(prevDoneRef.extracted_entities);
+    }
+    // Add the agent response to message history for next turn
+    const lastMsg = prevDoneRef.raw.messages as Array<{ type: string; content: string }> | undefined;
+    if (lastMsg && lastMsg.length > 0) {
+      // Build updated history: add last human message + agent response
+      const agentMsg = lastMsg[lastMsg.length - 1];
+      setMessageHistory((current) => {
+        const lastHumanDraft = messages[messages.length - 1];
+        const updates = [];
+        if (lastHumanDraft) {
+          updates.push({ type: 'human', content: lastHumanDraft.body });
+        }
+        updates.push({ type: agentMsg.type, content: agentMsg.content });
+        return [...current, ...updates];
+      });
+
+      // Add agent message to visible chat
+      setMessages((current) => [
+        ...current,
+        {
+          id: current.length + 1,
+          author: 'agent',
+          body: String(agentMsg.content),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevDoneRef, isStreaming]);
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-zinc-950">
@@ -458,15 +663,19 @@ export default function Home() {
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700">
+            <span className={`rounded-lg border px-3 py-1.5 font-medium ${isStreaming ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
               {isStreaming ? 'Streaming' : 'MCP ready'}
             </span>
-            <span className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 font-medium text-zinc-700">
-              3 open tickets
-            </span>
-            <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 font-medium text-amber-700">
-              1 needs review
-            </span>
+            {liveStatus && (
+              <span className={`rounded-lg border px-3 py-1.5 font-medium ${statusClasses(liveStatus as AgentStatus)}`}>
+                {liveStatus}
+              </span>
+            )}
+            {Object.keys(extractedEntities).length > 0 && (
+              <span className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 font-medium text-violet-700">
+                {Object.keys(extractedEntities).length} entities tracked
+              </span>
+            )}
           </div>
         </header>
 
@@ -496,11 +705,22 @@ export default function Home() {
                 <div className="space-y-2">
                   {tickets.map((ticket) => (
                     <button
-                      className="w-full rounded-lg border border-zinc-200 bg-white p-3 text-left transition hover:border-zinc-300 hover:bg-zinc-50"
+                      className={`w-full rounded-lg border p-3 text-left transition hover:bg-zinc-50 ${
+                        activeTicketId === ticket.id
+                          ? 'border-cyan-500 bg-white ring-2 ring-cyan-100'
+                          : 'border-zinc-200 bg-white hover:border-zinc-300'
+                      }`}
                       key={ticket.id}
+                      onClick={() => setActiveTicketId(ticket.id)}
                       type="button"
                     >
-                      <span className="block text-xs font-semibold text-zinc-500">
+                      <span
+                        className={`block text-xs font-semibold ${
+                          activeTicketId === ticket.id
+                            ? 'text-cyan-600'
+                            : 'text-zinc-500'
+                        }`}
+                      >
                         {ticket.id}
                       </span>
                       <span className="mt-1 block text-sm font-semibold text-zinc-950">
@@ -514,8 +734,17 @@ export default function Home() {
                 </div>
               </aside>
 
-              <div className="flex min-h-0 flex-col">
+              <div className="min-w-0 flex min-h-0 flex-col">
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+                  {messages.length === 0 && !isStreaming && (
+                    <div className="flex h-full items-center justify-center">
+                      <div className="text-center">
+                        <p className="text-lg font-semibold text-zinc-300">No messages yet</p>
+                        <p className="mt-1 text-sm text-zinc-400">Send a message to start a support session</p>
+                      </div>
+                    </div>
+                  )}
+
                   {messages.map((message) => (
                     <article
                       className={
@@ -533,39 +762,48 @@ export default function Home() {
                         </span>
                         <time>{message.time}</time>
                       </div>
-                      <p className="text-sm leading-6 text-zinc-800">
-                        {message.body}
-                      </p>
+                      <div className="text-sm leading-6 text-zinc-800">
+                        <div className='prose prose-sm wax-m-none'>
+                            <ReactMarkdown remarkPlugins = {[remarkGfm]}>
+                              {message.body}
+                            </ReactMarkdown>
+                        </div>
+                      </div>
                     </article>
                   ))}
-                  {(tokenText || error) && (
-                    <article className="ml-auto max-w-[82%] rounded-lg border border-cyan-200 bg-cyan-50 p-4">
+
+                  {/* Active Streaming / Result Message */}
+                  {(isStreaming || tokenText || error) && (
+                    <article className="ml-auto max-w-[82%] rounded-lg border border-cyan-200 bg-cyan-50 p-4 shadow-sm ring-1 ring-cyan-100">
                       <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-zinc-500">
-                        <span>AssistFlow Stream</span>
-                        <span>{isStreaming ? 'live' : 'done'}</span>
+                        <span className="flex items-center gap-2">
+                          AssistFlow {isStreaming ? 'Mind' : 'Agent'}
+                        </span>
+                        <span className="flex items-center gap-1.5 rounded-full bg-cyan-100/50 px-2 py-0.5 text-cyan-700">
+                          {isStreaming && <ThinkingDots />}
+                          {isStreaming ? 'Processing' : 'Response'}
+                        </span>
                       </div>
-                      <p className="text-sm leading-6 whitespace-pre-line text-zinc-800">
-                        {error ?? tokenText}
-                      </p>
-                      {evidenceToolCalls.map((call) => (
-                        <ToolEvidence call={call} key={call.id} />
-                      ))}
+                      <div className="space-y-4">
+                        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-zinc-800">
+                          {error ?? cleanText}
+                          {isStreaming && !tokenText && (
+                            <span className="animate-pulse-soft block italic text-zinc-500">
+                              Analyzing request and fetching data...
+                            </span>
+                          )}
+                        </p>
+                        <div className="space-y-2">
+                          {evidenceToolCalls.map((call) => (
+                            <ToolEvidence call={call} key={call.id} />
+                          ))}
+                        </div>
+                        {!isStreaming && liveResolution && (
+                          <ResolutionCard resolution={liveResolution} status={liveStatus} />
+                        )}
+                      </div>
                     </article>
                   )}
-                  {!tokenText &&
-                    !error &&
-                    evidenceToolCalls.map((call) => (
-                      <article
-                        className="ml-auto max-w-[82%] rounded-lg border border-cyan-200 bg-cyan-50 p-4"
-                        key={call.id}
-                      >
-                        <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-zinc-500">
-                          <span>AssistFlow Evidence</span>
-                          <span>{call.tool}</span>
-                        </div>
-                        <ToolEvidence call={call} />
-                      </article>
-                    ))}
                 </div>
 
                 <form
@@ -585,10 +823,10 @@ export default function Home() {
                     />
                     <button
                       className="h-11 rounded-lg bg-zinc-950 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-                      disabled={!draft.trim()}
+                      disabled={!draft.trim() || isStreaming}
                       type="submit"
                     >
-                      Send
+                      {isStreaming ? 'Processing...' : 'Send'}
                     </button>
                   </div>
                 </form>
@@ -597,36 +835,7 @@ export default function Home() {
           </section>
 
           <aside className="flex min-h-[calc(100vh-120px)] flex-col gap-4">
-            <section className="rounded-lg border border-zinc-200 bg-white">
-              <div className="border-b border-zinc-200 p-4">
-                <h2 className="text-base font-semibold text-zinc-950">
-                  Live Context
-                </h2>
-              </div>
-              <div className="grid grid-cols-3 border-b border-zinc-200 text-center">
-                <div className="p-3">
-                  <p className="text-xs font-medium text-zinc-500">Intent</p>
-                  <p className="mt-1 text-sm font-semibold text-zinc-950">
-                    Billing
-                  </p>
-                </div>
-                <div className="border-x border-zinc-200 p-3">
-                  <p className="text-xs font-medium text-zinc-500">Node</p>
-                  <p className="mt-1 text-sm font-semibold text-zinc-950">
-                    {String(latestStatus?.node ?? 'Guardrail')}
-                  </p>
-                </div>
-                <div className="p-3">
-                  <p className="text-xs font-medium text-zinc-500">Action</p>
-                  <p className="mt-1 text-sm font-semibold text-zinc-950">
-                    Refund
-                  </p>
-                </div>
-              </div>
-              <pre className="max-h-64 overflow-auto p-4 font-mono text-xs leading-5 text-zinc-700">
-                {jsonContext}
-              </pre>
-            </section>
+            <LiveContextPanel context={liveContext} status={liveStatus} />
 
             <section className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
               <div className="mb-3">
@@ -638,6 +847,7 @@ export default function Home() {
                 isStreaming={isStreaming}
                 latestStatus={latestStatus}
                 toolCalls={visibleToolCalls}
+                resolutionStatus={liveStatus || 'resolved'}
               />
             </section>
 
@@ -648,6 +858,9 @@ export default function Home() {
                 </h2>
               </div>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                {visibleToolCalls.length === 0 && (
+                  <p className="text-sm text-zinc-400 italic">No tool calls yet</p>
+                )}
                 {visibleToolCalls.map((call) => (
                   <article
                     className="rounded-lg border border-zinc-200 p-3"

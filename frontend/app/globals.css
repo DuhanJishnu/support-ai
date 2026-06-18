@@ -24,3 +24,38 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 1.5s ease-in-out infinite;
+}
+
+@keyframes thinking-wave {
+  0%,
+  100% {
+    transform: translateY(0px) scale(0.8);
+    opacity: 0.35;
+  }
+
+  50% {
+    transform: translateY(-8px) scale(1.35);
+    opacity: 1;
+  }
+}
+
+.animate-thinking-wave {
+  animation: thinking-wave 1s ease-in-out infinite;
+}
