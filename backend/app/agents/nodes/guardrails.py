@@ -46,7 +46,19 @@ def guardrail_node(state: AgentState | dict[str, Any]) -> AgentState:
             ),
         )
         resolution_status = "needs_human"
+    elif decision.action == "ESCALATE":
+        final_decision = decision
+        resolution_status = "needs_human"
+    elif decision.action == "REVIEW_CASE":
+        final_decision = decision
+        resolution_status = "in_progress"
+    elif decision.action == "NO_ACTION":
+        final_decision = decision
+        intent = agent_state.gathered_context.get("intent", "GENERAL")
+        # Billing issues with NO_ACTION still need follow-up
+        resolution_status = "in_progress" if intent == "BILLING" else "resolved"
     else:
+        # ISSUE_REFUND within limit
         final_decision = decision
         resolution_status = "resolved"
 

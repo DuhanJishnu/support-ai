@@ -6,8 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import structlog
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from app.agents.factory import get_llm
 from app.agents.state import AgentState, coerce_agent_state
 from app.api import mcp_tools
 
@@ -30,22 +31,35 @@ def _extract_identifier(
     explicit_value: Any,
     key: str,
     fallback: str,
+    extracted_entities: dict[str, Any] | None = None,
 ) -> str:
-    """Resolve a tool identifier from context, message text, or a stable fallback."""
+    """Resolve a tool identifier from context, entities, message text, or fallback.
+
+    Priority order:
+    1. Explicit value passed via gathered_context
+    2. Regex match in current message text (user just said the ID)
+    3. Previously extracted entities (from prior conversation turns)
+    4. Static fallback (mock ID)
+    """
     if explicit_value:
         return str(explicit_value)
 
+    # First try to find an ID in the current message text
     patterns = [
         rf"{key}\s*[:=#-]?\s*([A-Za-z0-9_-]+)",
         (
-            rf"\b({'txn' if key == 'transaction_id' else 'ride'})"
-            r"\s*[:=#-]?\s*([A-Za-z0-9_-]+)"
+            rf"\b({'txn' if key == 'transaction_id' else 'ride'}"
+            r"[A-Za-z0-9_-]*)"
         ),
     ]
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
             return match.group(match.lastindex or 1)
+
+    # Fall back to entities extracted from previous turns
+    if extracted_entities and key in extracted_entities:
+        return str(extracted_entities[key])
 
     return fallback
 
@@ -90,6 +104,7 @@ def _tool_agent_node(
         agent_state.gathered_context.get(input_key),
         input_key,
         fallback_id,
+        extracted_entities=agent_state.extracted_entities,
     )
     tool_input = {input_key: identifier}
 
@@ -131,12 +146,19 @@ def _tool_agent_node(
             "once tool discovery is healthy."
         )
 
+    # Persist extracted entity for future turns
+    updated_entities = {
+        **agent_state.extracted_entities,
+        input_key: identifier,
+    }
+
     response = AIMessage(content=response_text)
     return agent_state.model_copy(
         update={
             "messages": [*agent_state.messages, response],
             "current_node": node_name,
             "resolution_status": "in_progress",
+            "extracted_entities": updated_entities,
             "gathered_context": {
                 **agent_state.gathered_context,
                 input_key: identifier,
@@ -181,20 +203,41 @@ def telemetry_agent_node(state: AgentState | dict[str, Any]) -> AgentState:
 
 
 def generic_llm_node(state: AgentState | dict[str, Any]) -> AgentState:
-    """Stub: Generic LLM support sub-agent."""
+    """Generic LLM support sub-agent that handles non-specialized queries."""
     agent_state = coerce_agent_state(state)
     intent = agent_state.gathered_context.get("intent", "GENERAL")
     urgency = agent_state.gathered_context.get("urgency", 1)
 
     logger.info("GenericLLM: handling request", intent=intent, urgency=urgency)
 
-    response = AIMessage(
-        content=(
-            f"[GenericLLM] Your request has been received "
-            f"(intent={intent}, urgency={urgency}). "
-            "A specialized agent will handle this shortly."
-        )
+    # Use the factory to get an LLM
+    llm = get_llm(temperature=0.7)
+
+    # Prepare messages for the LLM
+    system_prompt = (
+        "You are a helpful customer support assistant for a ride-hailing service.\n"
+        f"The user's intent has been classified as {intent} with urgency {urgency}/5.\n"
+        "Provide a polite and helpful response to the user's query."
     )
+    messages = [
+        SystemMessage(content=system_prompt),
+        *agent_state.messages,
+    ]
+
+    try:
+        response = llm.invoke(messages)
+        if not isinstance(response, AIMessage):
+            # Handle cases where response might not be an AIMessage (though usually is)
+            response = AIMessage(content=str(response.content))
+    except Exception as exc:
+        logger.exception("GenericLLM: LLM invocation failed")
+        response = AIMessage(
+            content=(
+                f"I'm sorry, I'm having trouble processing your request right now. "
+                f"(Error: {exc})"
+            )
+        )
+
     return agent_state.model_copy(
         update={
             "messages": [*agent_state.messages, response],

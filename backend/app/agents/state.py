@@ -17,6 +17,8 @@ class AgentState(BaseModel):
     current_node: str = Field(default="entry")
     gathered_context: dict[str, Any] = Field(default_factory=dict)
     resolution_status: ResolutionStatus = Field(default="received")
+    conversation_id: str = Field(default="")
+    extracted_entities: dict[str, Any] = Field(default_factory=dict)
 
 
 def coerce_agent_state(state: AgentState | dict[str, Any]) -> AgentState:

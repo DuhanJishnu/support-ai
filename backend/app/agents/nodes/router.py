@@ -4,8 +4,9 @@ from typing import Any
 
 import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.language_models.chat_models import BaseChatModel
 
+from app.agents.factory import get_llm
 from app.agents.schemas import IntentClassification
 from app.agents.state import AgentState, coerce_agent_state
 from app.config import settings
@@ -35,13 +36,9 @@ ROUTER_SYSTEM_PROMPT = (
 )
 
 
-def get_router_llm() -> ChatGoogleGenerativeAI:
-    """Return a configured Gemini LLM bound to the IntentClassification schema."""
-    llm = ChatGoogleGenerativeAI(
-        model=settings.GEMINI_MODEL,
-        google_api_key=settings.GOOGLE_API_KEY,
-        temperature=0,
-    )
+def get_router_llm() -> BaseChatModel:
+    """Return a configured LLM bound to the IntentClassification schema."""
+    llm = get_llm(temperature=0)
     return llm.with_structured_output(IntentClassification)
 
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -11,6 +12,7 @@ from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
 from app.agents import run_support_graph
+from app.config import settings
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -20,6 +22,15 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, description="Customer support message")
     gathered_context: dict[str, Any] = Field(default_factory=dict)
+    conversation_id: str = Field(default="", description="Session ID for multi-turn")
+    previous_messages: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Serialized messages from prior turns",
+    )
+    extracted_entities: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Entities extracted in prior turns (transaction_id, ride_id)",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -32,6 +43,8 @@ class ChatResponse(BaseModel):
     reasoning: str
     gathered_context: dict[str, Any]
     messages: list[dict[str, Any]]
+    conversation_id: str = ""
+    extracted_entities: dict[str, Any] = Field(default_factory=dict)
 
 
 def encode_sse(event: str, data: dict[str, Any]) -> str:
@@ -47,6 +60,132 @@ def serialize_message(message: BaseMessage) -> dict[str, Any]:
     }
 
 
+def _ensure_conversation_id(request: ChatRequest) -> str:
+    """Return the request's conversation_id or generate a new one."""
+    return request.conversation_id or str(uuid.uuid4())
+
+
+async def simulated_stream(request: ChatRequest) -> AsyncIterator[str]:
+    """Provide a rich, simulated agent experience when LLM API is unavailable."""
+    msg = request.message.lower()
+    conv_id = _ensure_conversation_id(request)
+    intent = (
+        "BILLING"
+        if any(x in msg for x in ["charge", "pay", "refund", "fare", "money"])
+        else "SAFETY"
+        if any(x in msg for x in ["route", "driver", "gps", "danger", "safe"])
+        else "GENERAL"
+    )
+
+    yield encode_sse(
+        "agent_status_change",
+        {"node": "router", "status": "in_progress", "label": "Classifying intent"},
+    )
+    await asyncio.sleep(0.8)
+    yield encode_sse(
+        "token",
+        {"content": "I am analyzing your request to identify the correct specialist...\n"},
+    )
+    await asyncio.sleep(0.5)
+
+    node = (
+        "billing_agent"
+        if intent == "BILLING"
+        else "telemetry_agent"
+        if intent == "SAFETY"
+        else "generic_llm"
+    )
+    yield encode_sse(
+        "agent_status_change", {"node": node, "status": "querying", "intent": intent, "urgency": 3}
+    )
+
+    if intent == "BILLING":
+        yield encode_sse(
+            "token",
+            {"content": "Intent recognized as BILLING. Accessing transaction records via MCP...\n"},
+        )
+        await asyncio.sleep(1.2)
+        tool_call = {
+            "node": "billing_agent",
+            "tool_name": "verify_transaction_status",
+            "input": {"transaction_id": "txn_sim_99"},
+            "status": "succeeded",
+            "result": {
+                "data": {
+                    "transaction_id": "txn_sim_99",
+                    "status": "SUCCESS",
+                    "amount": 29.99,
+                    "currency": "USD",
+                    "payment_method": "Credit Card",
+                }
+            },
+        }
+        yield encode_sse("tool_invocation", tool_call)
+    elif intent == "SAFETY":
+        yield encode_sse(
+            "token",
+            {"content": "Intent recognized as SAFETY. Fetching ride telemetry data...\n"},
+        )
+        await asyncio.sleep(1.2)
+        tool_call = {
+            "node": "telemetry_agent",
+            "tool_name": "get_ride_route_deviation",
+            "input": {"ride_id": "ride_sim_101"},
+            "status": "succeeded",
+            "result": {
+                "data": {
+                    "ride_id": "ride_sim_101",
+                    "deviation_score": 0.12,
+                    "status": "Normal",
+                    "details": "Minor traffic-related detour detected. No safety risk identified.",
+                }
+            },
+        }
+        yield encode_sse("tool_invocation", tool_call)
+    else:
+        yield encode_sse(
+            "token",
+            {"content": "Directing your inquiry to our general support specialist...\n"},
+        )
+        await asyncio.sleep(1.0)
+
+    yield encode_sse("agent_status_change", {"node": "guardrail", "status": "in_progress"})
+    await asyncio.sleep(0.6)
+
+    final_text = "I've reviewed the system data. "
+    if intent == "BILLING":
+        final_text += (
+            "Your transaction txn_sim_99 was successful for $29.99. "
+            "I have forwarded this to our refund engine for a policy-compliant adjustment."
+        )
+    elif intent == "SAFETY":
+        final_text += (
+            "The route for ride_sim_101 shows a 12% deviation, which is within "
+            "standard traffic variance. Your safety score remains optimal."
+        )
+    else:
+        final_text += (
+            "I've logged your request in our general queue. "
+            "A human representative will follow up if further action is required."
+        )
+
+    for chunk in final_text.split(" "):
+        yield encode_sse("token", {"content": chunk + " "})
+        await asyncio.sleep(0.1)
+
+    yield encode_sse(
+        "done",
+        {
+            "current_node": "guardrail",
+            "resolution_status": "resolved",
+            "gathered_context": {"intent": intent, "urgency": 3},
+            "messages": [{"type": "ai", "content": final_text}],
+            "conversation_id": conv_id,
+            "extracted_entities": {},
+        },
+    )
+
+
 @router.post(
     "/chat",
     response_model=ChatResponse,
@@ -54,9 +193,13 @@ def serialize_message(message: BaseMessage) -> dict[str, Any]:
 )
 async def chat(request: ChatRequest) -> ChatResponse:
     """Classify intent via the Router Agent and route to the right sub-agent."""
+    conv_id = _ensure_conversation_id(request)
     state = run_support_graph(
         message=request.message,
         gathered_context=request.gathered_context,
+        previous_messages=request.previous_messages,
+        extracted_entities=request.extracted_entities,
+        conversation_id=conv_id,
     )
     ctx = state.gathered_context
     return ChatResponse(
@@ -67,11 +210,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
         reasoning=ctx.get("reasoning", ""),
         gathered_context=ctx,
         messages=[serialize_message(m) for m in state.messages],
+        conversation_id=state.conversation_id,
+        extracted_entities=state.extracted_entities,
     )
 
 
 async def stream_support_graph(request: ChatRequest) -> AsyncIterator[str]:
     """Yield agent progress as Server-Sent Events."""
+    conv_id = _ensure_conversation_id(request)
+
     yield encode_sse(
         "agent_status_change",
         {"node": "router", "status": "in_progress", "label": "Classifying intent"},
@@ -82,6 +229,9 @@ async def stream_support_graph(request: ChatRequest) -> AsyncIterator[str]:
     state = run_support_graph(
         message=request.message,
         gathered_context=request.gathered_context,
+        previous_messages=request.previous_messages,
+        extracted_entities=request.extracted_entities,
+        conversation_id=conv_id,
     )
     ctx = state.gathered_context
 
@@ -118,6 +268,8 @@ async def stream_support_graph(request: ChatRequest) -> AsyncIterator[str]:
             "resolution_status": state.resolution_status,
             "gathered_context": ctx,
             "messages": [serialize_message(m) for m in state.messages],
+            "conversation_id": state.conversation_id,
+            "extracted_entities": state.extracted_entities,
         },
     )
 
