@@ -27,12 +27,18 @@ services:
       - DEBUG=true
       - DATABASE_URL=postgresql+asyncpg://support_ai:support_ai@postgres:5432/support_ai
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - USE_OLLAMA=${USE_OLLAMA:-True}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:12b}
     depends_on:
       postgres:
         condition: service_healthy
       telemetry:
         condition: service_started
       billing:
+        condition: service_started
+      ollama:
         condition: service_started
     restart: unless-stopped
 
@@ -69,5 +75,23 @@ services:
       - PORT=8002
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  ollama_data:
