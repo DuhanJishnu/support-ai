@@ -10,13 +10,14 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import ValidationError
 
+from app.agents.nodes.guardrails import guardrail_node
 from app.agents.nodes.router import route_after_router, router_node
 from app.agents.nodes.stubs import (
     billing_agent_node,
     generic_llm_node,
     telemetry_agent_node,
 )
-from app.agents.schemas import IntentClassification
+from app.agents.schemas import IntentClassification, ResolutionDecision
 from app.agents.state import AgentState
 
 # ---------------------------------------------------------------------------
@@ -75,6 +76,65 @@ class TestIntentClassification:
                 urgency=2,
                 reasoning="test",
             )  # type: ignore
+
+
+class TestResolutionDecision:
+    def test_valid_refund_resolution(self):
+        result = ResolutionDecision(
+            action="ISSUE_REFUND",
+            amount=12.5,
+            reason="Duplicate charge detected.",
+        )
+        assert result.action == "ISSUE_REFUND"
+        assert result.amount == 12.5
+
+    def test_invalid_negative_amount_fails(self):
+        with pytest.raises(ValidationError):
+            ResolutionDecision(
+                action="ISSUE_REFUND",
+                amount=-1,
+                reason="Invalid refund.",
+            )
+
+
+class TestGuardrailNode:
+    def test_guardrail_allows_small_refund(self):
+        state = make_state(
+            extra_context={
+                "intent": "BILLING",
+                "urgency": 3,
+                "proposed_resolution": {
+                    "action": "ISSUE_REFUND",
+                    "amount": 12.5,
+                    "reason": "Duplicate charge detected.",
+                },
+            }
+        )
+
+        result = guardrail_node(state)
+
+        assert result.current_node == "guardrail"
+        assert result.resolution_status == "resolved"
+        assert result.gathered_context["resolution"]["action"] == "ISSUE_REFUND"
+
+    def test_guardrail_escalates_large_refund(self):
+        state = make_state(
+            extra_context={
+                "intent": "BILLING",
+                "urgency": 3,
+                "proposed_resolution": {
+                    "action": "ISSUE_REFUND",
+                    "amount": 75.0,
+                    "reason": "Large refund request.",
+                },
+            }
+        )
+
+        result = guardrail_node(state)
+
+        assert result.current_node == "guardrail"
+        assert result.resolution_status == "needs_human"
+        assert result.gathered_context["resolution"]["action"] == "ESCALATE"
 
 
 # ---------------------------------------------------------------------------
@@ -276,8 +336,10 @@ class TestFullGraph:
         result = run_support_graph("I was charged twice for my last ride.")
 
         assert result.gathered_context["intent"] == "BILLING"
-        assert result.current_node == "billing_agent"
-        assert result.resolution_status == "in_progress"
+        assert result.current_node == "guardrail"
+        assert result.resolution_status == "resolved"
+        assert result.gathered_context["last_node"] == "billing_agent"
+        assert result.gathered_context["resolution"]["action"] == "NO_ACTION"
         assert len(result.messages) == 2
         assert result.gathered_context["last_tool_call"]["tool_name"] == (
             "verify_transaction_status"
@@ -294,7 +356,10 @@ class TestFullGraph:
         result = run_support_graph("My driver is taking a very strange route!")
 
         assert result.gathered_context["intent"] == "SAFETY"
-        assert result.current_node == "telemetry_agent"
+        assert result.current_node == "guardrail"
+        assert result.resolution_status == "resolved"
+        assert result.gathered_context["last_node"] == "telemetry_agent"
+        assert result.gathered_context["resolution"]["action"] == "NO_ACTION"
         assert result.gathered_context["last_tool_call"]["tool_name"] == (
             "get_ride_route_deviation"
         )
@@ -310,4 +375,7 @@ class TestFullGraph:
         result = run_support_graph("How do I update my payment method?")
 
         assert result.gathered_context["intent"] == "GENERAL"
-        assert result.current_node == "generic_llm"
+        assert result.current_node == "guardrail"
+        assert result.resolution_status == "resolved"
+        assert result.gathered_context["last_node"] == "generic_llm"
+        assert result.gathered_context["resolution"]["action"] == "NO_ACTION"

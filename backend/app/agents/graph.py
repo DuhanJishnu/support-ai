@@ -5,6 +5,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 
+from app.agents.nodes.guardrails import guardrail_node
 from app.agents.nodes.router import route_after_router, router_node
 from app.agents.nodes.stubs import (
     billing_agent_node,
@@ -23,6 +24,7 @@ def build_support_graph():
     graph.add_node("billing_agent", billing_agent_node)
     graph.add_node("telemetry_agent", telemetry_agent_node)
     graph.add_node("generic_llm", generic_llm_node)
+    graph.add_node("guardrail", guardrail_node)
 
     # --- Entry point ---
     graph.set_entry_point("router")
@@ -38,10 +40,11 @@ def build_support_graph():
         },
     )
 
-    # --- All sub-agents terminate for now ---
-    graph.add_edge("billing_agent", END)
-    graph.add_edge("telemetry_agent", END)
-    graph.add_edge("generic_llm", END)
+    # --- Final policy validation ---
+    graph.add_edge("billing_agent", "guardrail")
+    graph.add_edge("telemetry_agent", "guardrail")
+    graph.add_edge("generic_llm", "guardrail")
+    graph.add_edge("guardrail", END)
 
     return graph.compile()
 

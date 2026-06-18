@@ -26,6 +26,7 @@ services:
     environment:
       - DEBUG=true
       - DATABASE_URL=postgresql+asyncpg://support_ai:support_ai@postgres:5432/support_ai
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy

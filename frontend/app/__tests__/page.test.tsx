@@ -1,30 +1,20 @@
 import { render, screen } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import Home from '../page';
 
-// Mock next/image since it is optimized for server-side environments
-vi.mock('next/image', () => ({
-  default: ({
-    src,
-    alt,
-    width,
-    height,
-    ...props
-  }: {
-    src: string;
-    alt: string;
-    width?: number;
-    height?: number;
-    priority?: boolean;
-    [key: string]: unknown;
-  }) => {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} width={width} height={height} {...props} />;
-  },
-}));
-
-test('renders Next.js homepage text', () => {
+test('renders the support dashboard shell', () => {
   render(<Home />);
-  const heading = screen.getByText(/To get started/i);
-  expect(heading).toBeInTheDocument();
+
+  expect(
+    screen.getByRole('heading', { name: /Support Console/i }),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Active ticket TCK-1048/i)).toBeInTheDocument();
+  expect(screen.getByText(/Live Context/i)).toBeInTheDocument();
+  expect(screen.getByText(/Tool Calls/i)).toBeInTheDocument();
+  expect(screen.getByText(/Agent Activity/i)).toBeInTheDocument();
+  expect(screen.getByText(/Thinking/i)).toBeInTheDocument();
+  expect(screen.getByText(/Transaction Evidence/i)).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: /Send/i }),
+  ).toBeDisabled();
 });

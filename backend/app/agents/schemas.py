@@ -6,6 +6,12 @@ from pydantic import BaseModel, Field
 
 # Intent categories the router can classify
 IntentCategory = Literal["BILLING", "SAFETY", "GENERAL"]
+ResolutionAction = Literal[
+    "ISSUE_REFUND",
+    "NO_ACTION",
+    "ESCALATE",
+    "REVIEW_CASE",
+]
 
 
 class IntentClassification(BaseModel):
@@ -31,4 +37,29 @@ class IntentClassification(BaseModel):
         description=(
             "One-sentence explanation of why this intent and urgency were chosen."
         )
+    )
+
+
+class ResolutionDecision(BaseModel):
+    """Deterministic final resolution produced by the policy guardrail."""
+
+    action: ResolutionAction = Field(
+        description=(
+            "The final support action to take. "
+            "ISSUE_REFUND for approved refunds, "
+            "ESCALATE when policy requires a human review, "
+            "REVIEW_CASE for ambiguous disputes, and "
+            "NO_ACTION when no remediation is needed."
+        )
+    )
+    amount: float = Field(
+        ge=0,
+        description=(
+            "Monetary amount associated with the action. "
+            "Use 0 when the action does not involve a refund."
+        ),
+    )
+    reason: str = Field(
+        min_length=1,
+        description="Short human-readable explanation for the final decision.",
     )

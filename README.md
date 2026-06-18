@@ -7,6 +7,7 @@ external operational data before proposing a resolution.
 
 ## Current Status
 
+Implemented through **Day 13** of the project roadmap.
 
 - Monorepo setup with Docker Compose for frontend, backend, PostgreSQL, and MCP servers.
 - Backend quality foundation with Ruff, Pytest, structured logging, correlation IDs,
@@ -23,6 +24,17 @@ external operational data before proposing a resolution.
   - Billing node that invokes transaction verification through MCP.
   - Telemetry node that invokes route deviation lookup through MCP.
   - Generic support node for non-specialized requests.
+  - Guardrail node that validates deterministic resolution decisions.
+- Next.js support console with a split chat workspace and live context/tool-call
+  panel.
+- Server-Sent Events endpoint for agent tokens, node status changes, tool
+  invocations, and final graph state.
+- `useAgentStream` React hook that posts support messages and parses streaming
+  events for the dashboard.
+- Agent activity indicators for thinking, MCP/database lookup, and policy
+  validation states.
+- Structured tool evidence panels for transaction checks and ride telemetry
+  output in the support chat.
 
 ## Architecture
 
@@ -45,9 +57,13 @@ FastAPI /api/agents/chat
     |
     v
 LangGraph router
-    |-- BILLING --> BillingAgent --> Billing MCP tool
-    |-- SAFETY  --> TelemetryAgent --> Telemetry MCP tool
-    `-- GENERAL --> GenericLLM
+    |
+    |-- BILLING --> BillingAgent --> Billing MCP tool ----|
+    |-- SAFETY  --> TelemetryAgent --> Telemetry MCP tool -|--> GuardrailNode
+    `-- GENERAL --> GenericLLM ---------------------------|
+                                                           |
+                                                           v
+                                                  Resolution decision
 ```
 
 ## Services
@@ -101,6 +117,14 @@ Run the agent graph:
 curl -X POST http://localhost:8000/api/agents/chat ^
   -H "Content-Type: application/json" ^
   -d "{\"message\":\"I was charged twice for transaction_id txn_123\"}"
+```
+
+Stream the agent graph:
+
+```bash
+curl -N -X POST http://localhost:8000/api/agents/chat/stream ^
+  -H "Content-Type: application/json" ^
+  -d "{\"message\":\"My driver took a strange route for ride_id ride_456\"}"
 ```
 
 List discovered MCP tools:
