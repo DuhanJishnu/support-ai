@@ -87,9 +87,7 @@ export function useAgentStream() {
       resolution: doneEvent.data.resolution as
         | Record<string, unknown>
         | undefined,
-      resolution_status: doneEvent.data.resolution_status as
-        | string
-        | undefined,
+      resolution_status: doneEvent.data.resolution_status as string | undefined,
       response: doneEvent.data.response as string | undefined,
       raw: doneEvent.data,
     };

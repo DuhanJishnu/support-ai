@@ -2,8 +2,8 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { useAgentStream } from './hooks/useAgentStream';
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 type AgentStatus =
   | 'resolved'
@@ -86,14 +86,14 @@ function getToolData(
 }
 
 function ThinkingDots() {
-  const delays = ["0s", "0.2s", "0.4s"];
+  const delays = ['0s', '0.2s', '0.4s'];
 
   return (
     <div className="flex items-center gap-1.5">
       {delays.map((delay) => (
         <span
           key={delay}
-          className="h-2 w-2 rounded-full bg-linear-to-br from-cyan-300 to-cyan-500 animate-thinking-wave shadow-lg shadow-cyan-500/40"
+          className="animate-thinking-wave h-2 w-2 rounded-full bg-linear-to-br from-cyan-300 to-cyan-500 shadow-lg shadow-cyan-500/40"
           style={{ animationDelay: delay }}
         />
       ))}
@@ -156,7 +156,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
 
   if (call.tool === 'verify_transaction_status') {
     return (
-      <section className="mt-3 rounded-lg border border-zinc-200 border-l-4 border-l-emerald-500 bg-white p-3 shadow-sm transition-all hover:shadow-md">
+      <section className="mt-3 rounded-lg border border-l-4 border-zinc-200 border-l-emerald-500 bg-white p-3 shadow-sm transition-all hover:shadow-md">
         <div className="mb-3 flex items-center justify-between gap-3 border-b border-zinc-100 pb-2">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -175,7 +175,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
         <div className="rounded-md border border-zinc-100 bg-zinc-50 p-3">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <div>
-              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+              <dt className="text-[10px] font-bold text-zinc-400 uppercase">
                 Transaction ID
               </dt>
               <dd className="mt-0.5 font-mono text-xs font-semibold text-zinc-950">
@@ -185,7 +185,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+              <dt className="text-[10px] font-bold text-zinc-400 uppercase">
                 Amount
               </dt>
               <dd className="mt-0.5 font-bold text-zinc-950">
@@ -193,15 +193,15 @@ function ToolEvidence({ call }: { call: ToolCall }) {
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+              <dt className="text-[10px] font-bold text-zinc-400 uppercase">
                 Payment Method
               </dt>
-              <dd className="mt-0.5 font-semibold italic text-zinc-700">
+              <dd className="mt-0.5 font-semibold text-zinc-700 italic">
                 {String(data.payment_method ?? 'Unknown')}
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-bold uppercase text-zinc-400">
+              <dt className="text-[10px] font-bold text-zinc-400 uppercase">
                 Gateway Resp
               </dt>
               <dd
@@ -260,13 +260,13 @@ function ToolEvidence({ call }: { call: ToolCall }) {
               style={{ width: `${Math.max(percent, 12)}%` }}
             />
             <div className="absolute top-5 left-4 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-sm">
-              <span className="text-white text-[8px] font-bold">A</span>
+              <span className="text-[8px] font-bold text-white">A</span>
             </div>
             <div className="absolute right-5 bottom-5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-rose-500 shadow-sm">
-              <span className="text-white text-[8px] font-bold">B</span>
+              <span className="text-[8px] font-bold text-white">B</span>
             </div>
             {score > 0.3 && (
-              <div className="absolute top-[45%] left-1/3 h-6 w-1 animate-pulse rotate-45 rounded-full bg-amber-400" />
+              <div className="absolute top-[45%] left-1/3 h-6 w-1 rotate-45 animate-pulse rounded-full bg-amber-400" />
             )}
           </div>
           <div className="mt-3 flex items-center justify-between text-sm">
@@ -284,7 +284,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <div className="rounded border border-zinc-100 bg-zinc-50 p-2 text-center">
-            <p className="text-[10px] font-bold uppercase text-zinc-400">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase">
               Ride ID
             </p>
             <p className="truncate text-xs font-semibold text-zinc-700">
@@ -292,7 +292,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
             </p>
           </div>
           <div className="rounded border border-zinc-100 bg-zinc-50 p-2 text-center">
-            <p className="text-[10px] font-bold uppercase text-zinc-400">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase">
               Status
             </p>
             <p className="truncate text-xs font-semibold text-zinc-700">
@@ -300,7 +300,7 @@ function ToolEvidence({ call }: { call: ToolCall }) {
             </p>
           </div>
         </div>
-        <p className="mt-3 text-xs leading-5 italic text-zinc-500">
+        <p className="mt-3 text-xs leading-5 text-zinc-500 italic">
           {String(data.details ?? 'Route data processed via Telemetry MCP.')}
         </p>
       </section>
@@ -310,14 +310,20 @@ function ToolEvidence({ call }: { call: ToolCall }) {
   return null;
 }
 
-const RESOLUTION_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
+const RESOLUTION_CONFIG: Record<
+  string,
+  { label: string; color: string; icon: string }
+> = {
   ISSUE_REFUND: { label: 'Refund Approved', color: 'emerald', icon: '✓' },
   ESCALATE: { label: 'Escalated to Manager', color: 'rose', icon: '⬆' },
   REVIEW_CASE: { label: 'Under Review', color: 'amber', icon: '⏳' },
   NO_ACTION: { label: 'No Action Required', color: 'zinc', icon: '—' },
 };
 
-function ResolutionCard({ resolution, status }: {
+function ResolutionCard({
+  resolution,
+  status,
+}: {
   resolution: Record<string, unknown>;
   status: string;
 }) {
@@ -340,25 +346,37 @@ function ResolutionCard({ resolution, status }: {
   };
 
   return (
-    <section className={`mt-3 rounded-lg border-2 p-4 transition-all ${colorMap[config.color]}`}>
-      <div className="flex items-center justify-between gap-3 mb-3">
+    <section
+      className={`mt-3 rounded-lg border-2 p-4 transition-all ${colorMap[config.color]}`}
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-lg">{config.icon}</span>
-          <h3 className="text-sm font-bold text-zinc-950">Resolution Decision</h3>
+          <h3 className="text-sm font-bold text-zinc-950">
+            Resolution Decision
+          </h3>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-bold ${badgeMap[config.color]}`}>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-bold ${badgeMap[config.color]}`}
+        >
           {config.label}
         </span>
       </div>
       {amount > 0 && (
         <div className="mb-3 rounded-md bg-white/60 p-3 text-center">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Refund Amount</p>
-          <p className="mt-1 text-2xl font-bold text-zinc-950">${amount.toFixed(2)}</p>
+          <p className="text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
+            Refund Amount
+          </p>
+          <p className="mt-1 text-2xl font-bold text-zinc-950">
+            ${amount.toFixed(2)}
+          </p>
         </div>
       )}
       <p className="text-sm leading-relaxed text-zinc-700">{reason}</p>
       <div className="mt-3 flex items-center gap-2 text-[10px] text-zinc-400">
-        <div className={`h-1.5 w-1.5 rounded-full ${status === 'resolved' ? 'bg-emerald-400' : status === 'needs_human' ? 'bg-rose-400' : 'bg-amber-400'}`} />
+        <div
+          className={`h-1.5 w-1.5 rounded-full ${status === 'resolved' ? 'bg-emerald-400' : status === 'needs_human' ? 'bg-rose-400' : 'bg-amber-400'}`}
+        />
         <span>Status: {status}</span>
       </div>
     </section>
@@ -390,7 +408,11 @@ function AgentActivity({
     },
     {
       label: 'Querying Database',
-      status: hasToolQuery ? 'querying' : (isStreaming ? 'in_progress' : 'resolved'),
+      status: hasToolQuery
+        ? 'querying'
+        : isStreaming
+          ? 'in_progress'
+          : 'resolved',
       detail: 'Specialist agents call billing or telemetry MCP tools.',
     },
     {
@@ -452,7 +474,10 @@ function AgentActivity({
   );
 }
 
-function LiveContextPanel({ context, status }: {
+function LiveContextPanel({
+  context,
+  status,
+}: {
   context: Record<string, unknown>;
   status: string;
 }) {
@@ -470,40 +495,60 @@ function LiveContextPanel({ context, status }: {
       </div>
       <div className="grid grid-cols-3 border-b border-zinc-200 text-center">
         <div className="p-3">
-          <p className="text-[10px] font-bold uppercase text-zinc-400">Intent</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase">
+            Intent
+          </p>
           <p className="mt-1 text-sm font-bold text-zinc-950">{intent}</p>
         </div>
         <div className="border-x border-zinc-200 p-3">
-          <p className="text-[10px] font-bold uppercase text-zinc-400">Node</p>
-          <p className="mt-1 text-sm font-bold text-zinc-950 capitalize">{currentNode}</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase">Node</p>
+          <p className="mt-1 text-sm font-bold text-zinc-950 capitalize">
+            {currentNode}
+          </p>
         </div>
         <div className="p-3">
-          <p className="text-[10px] font-bold uppercase text-zinc-400">Urgency</p>
-          <p className={`mt-1 text-sm font-bold ${urgency >= 4 ? 'text-rose-600' : urgency >= 3 ? 'text-amber-600' : 'text-zinc-950'}`}>{urgency}/5</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase">
+            Urgency
+          </p>
+          <p
+            className={`mt-1 text-sm font-bold ${urgency >= 4 ? 'text-rose-600' : urgency >= 3 ? 'text-amber-600' : 'text-zinc-950'}`}
+          >
+            {urgency}/5
+          </p>
         </div>
       </div>
 
       {/* Resolution section */}
       {resolution && (
         <div className="border-b border-zinc-200 p-4">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-[10px] font-bold uppercase text-zinc-400">Resolution</p>
-            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${statusClasses(status as AgentStatus)}`}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase">
+              Resolution
+            </p>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${statusClasses(status as AgentStatus)}`}
+            >
               {status}
             </span>
           </div>
-          <div className="rounded-md bg-zinc-50 p-3 space-y-2">
+          <div className="space-y-2 rounded-md bg-zinc-50 p-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-zinc-500">Action</span>
-              <span className="font-bold text-zinc-950">{String(resolution.action ?? '—')}</span>
+              <span className="font-bold text-zinc-950">
+                {String(resolution.action ?? '—')}
+              </span>
             </div>
             {Number(resolution.amount ?? 0) > 0 && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-zinc-500">Amount</span>
-                <span className="font-bold text-emerald-700">${Number(resolution.amount).toFixed(2)}</span>
+                <span className="font-bold text-emerald-700">
+                  ${Number(resolution.amount).toFixed(2)}
+                </span>
               </div>
             )}
-            <p className="text-xs leading-5 text-zinc-600 italic">{String(resolution.reason ?? '')}</p>
+            <p className="text-xs leading-5 text-zinc-600 italic">
+              {String(resolution.reason ?? '')}
+            </p>
           </div>
         </div>
       )}
@@ -513,9 +558,13 @@ function LiveContextPanel({ context, status }: {
         <button
           type="button"
           onClick={() => setShowJson(!showJson)}
-          className="flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-zinc-600 transition-colors"
+          className="flex items-center gap-2 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-600"
         >
-          <span className={`transition-transform ${showJson ? 'rotate-90' : ''}`}>▶</span>
+          <span
+            className={`transition-transform ${showJson ? 'rotate-90' : ''}`}
+          >
+            ▶
+          </span>
           Raw JSON
         </button>
         {showJson && (
@@ -536,11 +585,22 @@ export default function Home() {
 
   // Multi-turn conversation state
   const [conversationId, setConversationId] = useState('');
-  const [extractedEntities, setExtractedEntities] = useState<Record<string, unknown>>({});
-  const [messageHistory, setMessageHistory] = useState<Array<{ type: string; content: string }>>([]);
+  const [extractedEntities, setExtractedEntities] = useState<
+    Record<string, unknown>
+  >({});
+  const [messageHistory, setMessageHistory] = useState<
+    Array<{ type: string; content: string }>
+  >([]);
 
-  const { doneData, error, events, isStreaming, latestStatus, startStream, tokenText } =
-    useAgentStream();
+  const {
+    doneData,
+    error,
+    events,
+    isStreaming,
+    latestStatus,
+    startStream,
+    tokenText,
+  } = useAgentStream();
   const cleanText = tokenText.replace(/\n+/g, ' ');
   const activeTicket =
     tickets.find((t) => t.id === activeTicketId) || tickets[0];
@@ -585,7 +645,10 @@ export default function Home() {
     }
 
     const nextId = messages.length + 1;
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const now = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     setMessages((current) => [
       ...current,
       {
@@ -622,7 +685,9 @@ export default function Home() {
       setExtractedEntities(prevDoneRef.extracted_entities);
     }
     // Add the agent response to message history for next turn
-    const lastMsg = prevDoneRef.raw.messages as Array<{ type: string; content: string }> | undefined;
+    const lastMsg = prevDoneRef.raw.messages as
+      | Array<{ type: string; content: string }>
+      | undefined;
     if (lastMsg && lastMsg.length > 0) {
       // Build updated history: add last human message + agent response
       const agentMsg = lastMsg[lastMsg.length - 1];
@@ -643,7 +708,10 @@ export default function Home() {
           id: current.length + 1,
           author: 'agent',
           body: String(agentMsg.content),
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          time: new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
         },
       ]);
     }
@@ -663,11 +731,15 @@ export default function Home() {
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className={`rounded-lg border px-3 py-1.5 font-medium ${isStreaming ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+            <span
+              className={`rounded-lg border px-3 py-1.5 font-medium ${isStreaming ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}
+            >
               {isStreaming ? 'Streaming' : 'MCP ready'}
             </span>
             {liveStatus && (
-              <span className={`rounded-lg border px-3 py-1.5 font-medium ${statusClasses(liveStatus as AgentStatus)}`}>
+              <span
+                className={`rounded-lg border px-3 py-1.5 font-medium ${statusClasses(liveStatus as AgentStatus)}`}
+              >
                 {liveStatus}
               </span>
             )}
@@ -734,13 +806,17 @@ export default function Home() {
                 </div>
               </aside>
 
-              <div className="min-w-0 flex min-h-0 flex-col">
+              <div className="flex min-h-0 min-w-0 flex-col">
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
                   {messages.length === 0 && !isStreaming && (
                     <div className="flex h-full items-center justify-center">
                       <div className="text-center">
-                        <p className="text-lg font-semibold text-zinc-300">No messages yet</p>
-                        <p className="mt-1 text-sm text-zinc-400">Send a message to start a support session</p>
+                        <p className="text-lg font-semibold text-zinc-300">
+                          No messages yet
+                        </p>
+                        <p className="mt-1 text-sm text-zinc-400">
+                          Send a message to start a support session
+                        </p>
                       </div>
                     </div>
                   )}
@@ -763,10 +839,10 @@ export default function Home() {
                         <time>{message.time}</time>
                       </div>
                       <div className="text-sm leading-6 text-zinc-800">
-                        <div className='prose prose-sm wax-m-none'>
-                            <ReactMarkdown remarkPlugins = {[remarkGfm]}>
-                              {message.body}
-                            </ReactMarkdown>
+                        <div className="prose prose-sm wax-m-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.body}
+                          </ReactMarkdown>
                         </div>
                       </div>
                     </article>
@@ -785,10 +861,10 @@ export default function Home() {
                         </span>
                       </div>
                       <div className="space-y-4">
-                        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-zinc-800">
+                        <p className="text-sm leading-6 break-words whitespace-pre-wrap text-zinc-800">
                           {error ?? cleanText}
                           {isStreaming && !tokenText && (
-                            <span className="animate-pulse-soft block italic text-zinc-500">
+                            <span className="animate-pulse-soft block text-zinc-500 italic">
                               Analyzing request and fetching data...
                             </span>
                           )}
@@ -799,7 +875,10 @@ export default function Home() {
                           ))}
                         </div>
                         {!isStreaming && liveResolution && (
-                          <ResolutionCard resolution={liveResolution} status={liveStatus} />
+                          <ResolutionCard
+                            resolution={liveResolution}
+                            status={liveStatus}
+                          />
                         )}
                       </div>
                     </article>
@@ -859,7 +938,9 @@ export default function Home() {
               </div>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
                 {visibleToolCalls.length === 0 && (
-                  <p className="text-sm text-zinc-400 italic">No tool calls yet</p>
+                  <p className="text-sm text-zinc-400 italic">
+                    No tool calls yet
+                  </p>
                 )}
                 {visibleToolCalls.map((call) => (
                   <article

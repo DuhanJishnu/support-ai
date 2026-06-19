@@ -19,9 +19,7 @@ class Settings(BaseSettings):
     MCP_REQUEST_TIMEOUT: float = 30.0
 
     # LLM settings
-    GOOGLE_API_KEY_DEFAULT: str = (
-        ""
-    )
+    GOOGLE_API_KEY_DEFAULT: str = ""
     GOOGLE_API_KEY: str = GOOGLE_API_KEY_DEFAULT
     GEMINI_MODEL: str = "gemini-2.5-flash-lite"
 
