@@ -34,8 +34,7 @@ class Settings(BaseSettings):
     def is_gemini_available(self) -> bool:
         """Check if a non-default Gemini API key is provided."""
         return bool(
-            self.GOOGLE_API_KEY
-            and self.GOOGLE_API_KEY != self.GOOGLE_API_KEY_DEFAULT
+            self.GOOGLE_API_KEY and self.GOOGLE_API_KEY != self.GOOGLE_API_KEY_DEFAULT
         )
 
     @property

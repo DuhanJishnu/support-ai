@@ -12,7 +12,6 @@ from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
 from app.agents import run_support_graph
-from app.config import settings
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -84,7 +83,11 @@ async def simulated_stream(request: ChatRequest) -> AsyncIterator[str]:
     await asyncio.sleep(0.8)
     yield encode_sse(
         "token",
-        {"content": "I am analyzing your request to identify the correct specialist...\n"},
+        {
+            "content": (
+                "I am analyzing your request to identify the correct specialist...\n"
+            )
+        },
     )
     await asyncio.sleep(0.5)
 
@@ -96,13 +99,19 @@ async def simulated_stream(request: ChatRequest) -> AsyncIterator[str]:
         else "generic_llm"
     )
     yield encode_sse(
-        "agent_status_change", {"node": node, "status": "querying", "intent": intent, "urgency": 3}
+        "agent_status_change",
+        {"node": node, "status": "querying", "intent": intent, "urgency": 3},
     )
 
     if intent == "BILLING":
         yield encode_sse(
             "token",
-            {"content": "Intent recognized as BILLING. Accessing transaction records via MCP...\n"},
+            {
+                "content": (
+                    "Intent recognized as BILLING. "
+                    "Accessing transaction records via MCP...\n"
+                )
+            },
         )
         await asyncio.sleep(1.2)
         tool_call = {
@@ -124,7 +133,11 @@ async def simulated_stream(request: ChatRequest) -> AsyncIterator[str]:
     elif intent == "SAFETY":
         yield encode_sse(
             "token",
-            {"content": "Intent recognized as SAFETY. Fetching ride telemetry data...\n"},
+            {
+                "content": (
+                    "Intent recognized as SAFETY. Fetching ride telemetry data...\n"
+                )
+            },
         )
         await asyncio.sleep(1.2)
         tool_call = {
@@ -137,7 +150,10 @@ async def simulated_stream(request: ChatRequest) -> AsyncIterator[str]:
                     "ride_id": "ride_sim_101",
                     "deviation_score": 0.12,
                     "status": "Normal",
-                    "details": "Minor traffic-related detour detected. No safety risk identified.",
+                    "details": (
+                        "Minor traffic-related detour detected. "
+                        "No safety risk identified."
+                    ),
                 }
             },
         }
@@ -145,18 +161,24 @@ async def simulated_stream(request: ChatRequest) -> AsyncIterator[str]:
     else:
         yield encode_sse(
             "token",
-            {"content": "Directing your inquiry to our general support specialist...\n"},
+            {
+                "content": "Directing your inquiry to our "
+                "general support specialist...\n"
+            },
         )
         await asyncio.sleep(1.0)
 
-    yield encode_sse("agent_status_change", {"node": "guardrail", "status": "in_progress"})
+    yield encode_sse(
+        "agent_status_change", {"node": "guardrail", "status": "in_progress"}
+    )
     await asyncio.sleep(0.6)
 
     final_text = "I've reviewed the system data. "
     if intent == "BILLING":
         final_text += (
             "Your transaction txn_sim_99 was successful for $29.99. "
-            "I have forwarded this to our refund engine for a policy-compliant adjustment."
+            "I have forwarded this to our refund engine for a "
+            "policy-compliant adjustment."
         )
     elif intent == "SAFETY":
         final_text += (

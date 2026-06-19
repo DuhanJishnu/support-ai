@@ -3,13 +3,12 @@
 from typing import Any
 
 import structlog
-from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.factory import get_llm
 from app.agents.schemas import IntentClassification
 from app.agents.state import AgentState, coerce_agent_state
-from app.config import settings
 
 logger = structlog.get_logger()
 

@@ -8,8 +8,7 @@ full graph state transition verification.
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 
 from app.agents.graph import run_support_graph
 from app.agents.nodes.billing_decision import billing_decision_node
@@ -99,7 +98,9 @@ class TestMultiTurnTransactionMemory:
 
         # The same txn_abc123 should be used thanks to extracted_entities
         assert turn2.extracted_entities.get("transaction_id") == "txn_abc123"
-        assert turn2.gathered_context["billing"]["input"]["transaction_id"] == "txn_abc123"
+        assert (
+            turn2.gathered_context["billing"]["input"]["transaction_id"] == "txn_abc123"
+        )
 
     @patch("app.agents.nodes.stubs._invoke_mcp_tool")
     @patch("app.agents.nodes.router.get_router_llm")
@@ -228,84 +229,96 @@ class TestGuardrailDecisions:
 
     def test_issue_refund_within_limit_resolves(self):
         """ISSUE_REFUND ≤ $50 → resolved."""
-        state = _make_state(extra_context={
-            "intent": "BILLING",
-            "proposed_resolution": {
-                "action": "ISSUE_REFUND",
-                "amount": 50.00,
-                "reason": "Approved refund.",
-            },
-        })
+        state = _make_state(
+            extra_context={
+                "intent": "BILLING",
+                "proposed_resolution": {
+                    "action": "ISSUE_REFUND",
+                    "amount": 50.00,
+                    "reason": "Approved refund.",
+                },
+            }
+        )
         result = guardrail_node(state)
         assert result.resolution_status == "resolved"
         assert result.gathered_context["resolution"]["action"] == "ISSUE_REFUND"
 
     def test_issue_refund_over_limit_needs_human(self):
         """ISSUE_REFUND > $50 → needs_human (ESCALATE)."""
-        state = _make_state(extra_context={
-            "intent": "BILLING",
-            "proposed_resolution": {
-                "action": "ISSUE_REFUND",
-                "amount": 50.01,
-                "reason": "Large refund.",
-            },
-        })
+        state = _make_state(
+            extra_context={
+                "intent": "BILLING",
+                "proposed_resolution": {
+                    "action": "ISSUE_REFUND",
+                    "amount": 50.01,
+                    "reason": "Large refund.",
+                },
+            }
+        )
         result = guardrail_node(state)
         assert result.resolution_status == "needs_human"
         assert result.gathered_context["resolution"]["action"] == "ESCALATE"
 
     def test_review_case_in_progress(self):
         """REVIEW_CASE → in_progress."""
-        state = _make_state(extra_context={
-            "intent": "BILLING",
-            "proposed_resolution": {
-                "action": "REVIEW_CASE",
-                "amount": 0.0,
-                "reason": "Needs review.",
-            },
-        })
+        state = _make_state(
+            extra_context={
+                "intent": "BILLING",
+                "proposed_resolution": {
+                    "action": "REVIEW_CASE",
+                    "amount": 0.0,
+                    "reason": "Needs review.",
+                },
+            }
+        )
         result = guardrail_node(state)
         assert result.resolution_status == "in_progress"
         assert result.gathered_context["resolution"]["action"] == "REVIEW_CASE"
 
     def test_escalate_needs_human(self):
         """ESCALATE → needs_human."""
-        state = _make_state(extra_context={
-            "intent": "BILLING",
-            "proposed_resolution": {
-                "action": "ESCALATE",
-                "amount": 0.0,
-                "reason": "Tool error.",
-            },
-        })
+        state = _make_state(
+            extra_context={
+                "intent": "BILLING",
+                "proposed_resolution": {
+                    "action": "ESCALATE",
+                    "amount": 0.0,
+                    "reason": "Tool error.",
+                },
+            }
+        )
         result = guardrail_node(state)
         assert result.resolution_status == "needs_human"
         assert result.gathered_context["resolution"]["action"] == "ESCALATE"
 
     def test_no_action_billing_in_progress(self):
         """NO_ACTION on BILLING intent → in_progress."""
-        state = _make_state(extra_context={
-            "intent": "BILLING",
-            "proposed_resolution": {
-                "action": "NO_ACTION",
-                "amount": 0.0,
-                "reason": "No action needed.",
-            },
-        })
+        state = _make_state(
+            extra_context={
+                "intent": "BILLING",
+                "proposed_resolution": {
+                    "action": "NO_ACTION",
+                    "amount": 0.0,
+                    "reason": "No action needed.",
+                },
+            }
+        )
         result = guardrail_node(state)
         assert result.resolution_status == "in_progress"
         assert result.gathered_context["resolution"]["action"] == "NO_ACTION"
 
     def test_no_action_general_resolved(self):
         """NO_ACTION on GENERAL intent → resolved."""
-        state = _make_state(extra_context={
-            "intent": "GENERAL",
-            "proposed_resolution": {
-                "action": "NO_ACTION",
-                "amount": 0.0,
-                "reason": "No action needed.",
-            },
-        })
+        state = _make_state(
+            extra_context={
+                "intent": "GENERAL",
+                "proposed_resolution": {
+                    "action": "NO_ACTION",
+                    "amount": 0.0,
+                    "reason": "No action needed.",
+                },
+            }
+        )
         result = guardrail_node(state)
         assert result.resolution_status == "resolved"
         assert result.gathered_context["resolution"]["action"] == "NO_ACTION"
@@ -334,9 +347,14 @@ class TestBillingFlowStateTransitions:
 
         # --- billing_agent called MCP tool ---
         assert result.gathered_context["last_node"] == "billing_agent"
-        assert result.gathered_context["last_tool_call"]["tool_name"] == "verify_transaction_status"
+        assert (
+            result.gathered_context["last_tool_call"]["tool_name"]
+            == "verify_transaction_status"
+        )
         assert result.gathered_context["last_tool_call"]["status"] == "succeeded"
-        assert result.gathered_context["billing"]["result"]["data"]["status"] == "SUCCESS"
+        assert (
+            result.gathered_context["billing"]["result"]["data"]["status"] == "SUCCESS"
+        )
 
         # --- billing_decision proposed ISSUE_REFUND ---
         assert result.gathered_context["billing_decision"]["is_duplicate_claim"] is True
@@ -441,7 +459,9 @@ class TestBillingDecisionNode:
                 "urgency": 3,
                 "billing": {
                     "tool": "verify_transaction_status",
-                    "input": {"transaction_id": txn_data.get("transaction_id", "txn_x")},
+                    "input": {
+                        "transaction_id": txn_data.get("transaction_id", "txn_x")
+                    },
                     "result": {"data": txn_data},
                 },
             },
@@ -453,7 +473,9 @@ class TestBillingDecisionNode:
             {"transaction_id": "txn_d1", "status": "SUCCESS", "amount": 20.0},
         )
         result = billing_decision_node(state)
-        assert result.gathered_context["proposed_resolution"]["action"] == "ISSUE_REFUND"
+        assert (
+            result.gathered_context["proposed_resolution"]["action"] == "ISSUE_REFUND"
+        )
         assert result.gathered_context["proposed_resolution"]["amount"] == 20.0
 
     def test_refund_keyword_success_issues_refund(self):
@@ -462,7 +484,9 @@ class TestBillingDecisionNode:
             {"transaction_id": "txn_r1", "status": "SUCCESS", "amount": 10.0},
         )
         result = billing_decision_node(state)
-        assert result.gathered_context["proposed_resolution"]["action"] == "ISSUE_REFUND"
+        assert (
+            result.gathered_context["proposed_resolution"]["action"] == "ISSUE_REFUND"
+        )
 
     def test_pending_transaction_reviews_case(self):
         state = self._state_with_billing_result(
