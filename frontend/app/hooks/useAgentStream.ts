@@ -146,11 +146,21 @@ export function useAgentStream() {
 
           if (parsed.type === 'done') {
             finalDoneData = {
-              conversation_id: parsed.data.conversation_id as string | undefined,
-              extracted_entities: parsed.data.extracted_entities as Record<string, unknown> | undefined,
-              gathered_context: parsed.data.gathered_context as Record<string, unknown> | undefined,
-              resolution: parsed.data.resolution as Record<string, unknown> | undefined,
-              resolution_status: parsed.data.resolution_status as string | undefined,
+              conversation_id: parsed.data.conversation_id as
+                | string
+                | undefined,
+              extracted_entities: parsed.data.extracted_entities as
+                | Record<string, unknown>
+                | undefined,
+              gathered_context: parsed.data.gathered_context as
+                | Record<string, unknown>
+                | undefined,
+              resolution: parsed.data.resolution as
+                | Record<string, unknown>
+                | undefined,
+              resolution_status: parsed.data.resolution_status as
+                | string
+                | undefined,
               response: parsed.data.response as string | undefined,
               raw: parsed.data,
             };
@@ -178,7 +188,7 @@ export function useAgentStream() {
     } finally {
       setIsStreaming(false);
     }
-    
+
     return finalDoneData;
   }, []);
 
