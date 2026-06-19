@@ -22,10 +22,11 @@ def test_get_llm_uses_ollama_when_gemini_missing():
         assert llm.model == settings.OLLAMA_MODEL
 
 
-def test_get_llm_uses_gemini_when_key_provided():
+def test_get_llm_uses_gemini_when_key_provided_and_no_ollama():
     """Verify that Gemini is used when a real-ish API key is provided."""
     settings = Settings()
     settings.GOOGLE_API_KEY = "real_key_123"
+    settings.USE_OLLAMA = False
     assert settings.is_gemini_available
 
     with patch("app.agents.factory.settings", settings):
