@@ -93,12 +93,8 @@ export function useAgentStream() {
     };
   }, [events]);
 
-  const startStream = useCallback(async (request: StreamRequest) => {
-    setEvents([]);
-    setError(null);
-    setIsStreaming(true);
-
-    let finalDoneData: {
+  const startStream = useCallback(
+    async (request: StreamRequest): Promise<{
       conversation_id?: string;
       extracted_entities?: Record<string, unknown>;
       gathered_context?: Record<string, unknown>;
@@ -106,7 +102,20 @@ export function useAgentStream() {
       resolution_status?: string;
       response?: string;
       raw: Record<string, unknown>;
-    } | null = null;
+    } | null> => {
+      setEvents([]);
+      setError(null);
+      setIsStreaming(true);
+
+      let finalDoneData: {
+        conversation_id?: string;
+        extracted_entities?: Record<string, unknown>;
+        gathered_context?: Record<string, unknown>;
+        resolution?: Record<string, unknown>;
+        resolution_status?: string;
+        response?: string;
+        raw: Record<string, unknown>;
+      } | null = null;
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/agents/chat/stream`, {
