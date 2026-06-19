@@ -94,7 +94,9 @@ export function useAgentStream() {
   }, [events]);
 
   const startStream = useCallback(
-    async (request: StreamRequest): Promise<{
+    async (
+      request: StreamRequest
+    ): Promise<{
       conversation_id?: string;
       extracted_entities?: Record<string, unknown>;
       gathered_context?: Record<string, unknown>;
@@ -117,89 +119,91 @@ export function useAgentStream() {
         raw: Record<string, unknown>;
       } | null = null;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/chat/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
-        body: JSON.stringify({
-          message: request.message,
-          gathered_context: request.gathered_context ?? {},
-          conversation_id: request.conversation_id,
-          previous_messages: request.previous_messages,
-          extracted_entities: request.extracted_entities,
-        }),
-      });
-
-      if (!response.ok || !response.body) {
-        throw new Error('Agent stream failed to start.');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        const frames = buffer.split('\n\n');
-        buffer = frames.pop() ?? '';
-
-        frames.forEach((frame) => {
-          const parsed = parseSseFrame(frame);
-          if (!parsed) {
-            return;
-          }
-
-          if (parsed.type === 'done') {
-            finalDoneData = {
-              conversation_id: parsed.data.conversation_id as
-                | string
-                | undefined,
-              extracted_entities: parsed.data.extracted_entities as
-                | Record<string, unknown>
-                | undefined,
-              gathered_context: parsed.data.gathered_context as
-                | Record<string, unknown>
-                | undefined,
-              resolution: parsed.data.resolution as
-                | Record<string, unknown>
-                | undefined,
-              resolution_status: parsed.data.resolution_status as
-                | string
-                | undefined,
-              response: parsed.data.response as string | undefined,
-              raw: parsed.data,
-            };
-          }
-
-          setEvents((current) => [
-            ...current,
-            {
-              id: current.length + 1,
-              ...parsed,
-            },
-          ]);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/agents/chat/stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+          },
+          body: JSON.stringify({
+            message: request.message,
+            gathered_context: request.gathered_context ?? {},
+            conversation_id: request.conversation_id,
+            previous_messages: request.previous_messages,
+            extracted_entities: request.extracted_entities,
+          }),
         });
 
-        if (done) {
-          break;
+        if (!response.ok || !response.body) {
+          throw new Error('Agent stream failed to start.');
         }
-      }
-    } catch (streamError) {
-      setError(
-        streamError instanceof Error
-          ? streamError.message
-          : 'Agent stream failed.'
-      );
-    } finally {
-      setIsStreaming(false);
-    }
 
-    return finalDoneData;
-  }, []);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          buffer += decoder.decode(value, { stream: !done });
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() ?? '';
+
+          frames.forEach((frame) => {
+            const parsed = parseSseFrame(frame);
+            if (!parsed) {
+              return;
+            }
+
+            if (parsed.type === 'done') {
+              finalDoneData = {
+                conversation_id: parsed.data.conversation_id as
+                  | string
+                  | undefined,
+                extracted_entities: parsed.data.extracted_entities as
+                  | Record<string, unknown>
+                  | undefined,
+                gathered_context: parsed.data.gathered_context as
+                  | Record<string, unknown>
+                  | undefined,
+                resolution: parsed.data.resolution as
+                  | Record<string, unknown>
+                  | undefined,
+                resolution_status: parsed.data.resolution_status as
+                  | string
+                  | undefined,
+                response: parsed.data.response as string | undefined,
+                raw: parsed.data,
+              };
+            }
+
+            setEvents((current) => [
+              ...current,
+              {
+                id: current.length + 1,
+                ...parsed,
+              },
+            ]);
+          });
+
+          if (done) {
+            break;
+          }
+        }
+      } catch (streamError) {
+        setError(
+          streamError instanceof Error
+            ? streamError.message
+            : 'Agent stream failed.'
+        );
+      } finally {
+        setIsStreaming(false);
+      }
+
+      return finalDoneData;
+    },
+    []
+  );
 
   return {
     doneData,

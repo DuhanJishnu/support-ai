@@ -1,176 +1,207 @@
-# AssistFlow - Multi-Agent Customer Support Platform
+<p align="center">
+  <h1 align="center">AssistFlow</h1>
+  <p align="center">
+    <strong>Multi-Agent Customer Support Platform powered by LangGraph & MCP</strong>
+  </p>
+  <p align="center">
+    <a href="#quick-start">Quick Start</a> · <a href="#architecture">Architecture</a> · <a href="#tech-stack">Tech Stack</a> · <a href="#api-usage">API</a>
+  </p>
+</p>
 
-AssistFlow is a production-oriented support automation platform for a ride-hailing
-business. It combines **FastAPI**, **Next.js**, **LangGraph**, PostgreSQL, and the
-**Model Context Protocol (MCP)** so specialized agents can route tickets and fetch
-external operational data before proposing a resolution.
+---
 
-## Current Status
+AssistFlow is an autonomous support platform for ride-hailing businesses. It uses a **multi-agent LangGraph workflow** to classify tickets, fetch real-time operational data via the **Model Context Protocol (MCP)**, and produce policy-validated resolutions — all streamed live to a Next.js dashboard.
 
-Implemented through **Day 13** of the project roadmap.
+## Key Features
 
-- Monorepo setup with Docker Compose for frontend, backend, PostgreSQL, and MCP servers.
-- Backend quality foundation with Ruff, Pytest, structured logging, correlation IDs,
-  and standard JSON error responses.
-- Async SQLAlchemy models and Alembic migration for users, rides, transactions, and
-  support tickets.
-- Mock data seeding script for local ride-hailing support scenarios.
-- Standalone MCP services:
-  - Telemetry: `get_ride_route_deviation`
-  - Billing: `verify_transaction_status`
-- FastAPI MCP client manager for tool discovery and invocation.
-- LangGraph support workflow with:
-  - Router node for structured intent classification.
-  - Billing node that invokes transaction verification through MCP.
-  - Telemetry node that invokes route deviation lookup through MCP.
-  - Generic support node for non-specialized requests.
-  - Guardrail node that validates deterministic resolution decisions.
-- Next.js support console with a split chat workspace and live context/tool-call
-  panel.
-- Server-Sent Events endpoint for agent tokens, node status changes, tool
-  invocations, and final graph state.
-- `useAgentStream` React hook that posts support messages and parses streaming
-  events for the dashboard.
-- Agent activity indicators for thinking, MCP/database lookup, and policy
-  validation states.
-- Structured tool evidence panels for transaction checks and ride telemetry
-  output in the support chat.
+- **Intelligent Routing** — LLM-powered triage classifies intent (`BILLING` / `SAFETY` / `GENERAL`) with urgency scoring (1–5) using structured outputs
+- **MCP Tool Integration** — Agents autonomously discover and invoke external tools at runtime for transaction verification and ride telemetry
+- **Policy Guardrails** — Deterministic resolution engine enforces refund limits, escalation rules, and Pydantic-validated action schemas
+- **Real-Time Streaming** — SSE endpoint streams token-by-token responses, agent state transitions, and tool invocations to the frontend
+- **Live Observability Dashboard** — Split-pane UI shows the chat alongside agent thinking states, MCP lookups, and structured evidence panels
 
 ## Architecture
 
-```text
+### System Overview
+
+```mermaid
+graph TB
+    User([👤 Customer])
+    
+    subgraph Frontend["🖥️ Next.js Frontend :3000"]
+        UI[Support Dashboard]
+        Hook[useAgentStream Hook]
+    end
+    
+    subgraph Backend["⚙️ FastAPI Backend :8000"]
+        API["/api/agents/chat/stream"]
+        MCP_Client[MCP Client Manager]
+        
+        subgraph LangGraph["LangGraph Workflow"]
+            Router[Router Agent]
+            Billing[Billing Agent]
+            Telemetry[Telemetry Agent]
+            Generic[Generic LLM Agent]
+            Decision[Billing Decision Engine]
+            Guardrail[Guardrail Node]
+        end
+    end
+    
+    subgraph MCP_Servers["🔧 MCP Servers"]
+        BillingMCP["Billing MCP :8002<br/>verify_transaction_status"]
+        TelemetryMCP["Telemetry MCP :8001<br/>get_ride_route_deviation"]
+    end
+    
+    DB[(PostgreSQL)]
+    LLM[Gemini / Ollama]
+    
+    User -->|Message| UI
+    UI -->|SSE Stream| API
+    API --> Router
+    Router -->|BILLING| Billing
+    Router -->|SAFETY| Telemetry
+    Router -->|GENERAL| Generic
+    Billing -->|MCP Call| MCP_Client
+    Telemetry -->|MCP Call| MCP_Client
+    MCP_Client --> BillingMCP
+    MCP_Client --> TelemetryMCP
+    Billing --> Decision
+    Decision --> Guardrail
+    Telemetry --> Guardrail
+    Generic --> Guardrail
+    Guardrail -->|SSE| Hook
+    Hook --> UI
+    Router -.->|Structured Output| LLM
+    Generic -.-> LLM
+    Decision -.-> LLM
+    Backend --> DB
+```
+
+### Agent Decision Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Router
+    
+    Router --> BillingAgent: intent = BILLING
+    Router --> TelemetryAgent: intent = SAFETY
+    Router --> GenericLLM: intent = GENERAL
+    
+    BillingAgent --> BillingDecision: MCP tool result
+    BillingDecision --> Guardrail: Proposed resolution
+    
+    TelemetryAgent --> Guardrail: MCP tool result
+    GenericLLM --> Guardrail: LLM response
+    
+    Guardrail --> Resolved: ✅ Within policy
+    Guardrail --> Escalated: ⚠️ Refund > $50
+    Guardrail --> HumanReview: 🔍 Needs review
+    
+    Resolved --> [*]
+    Escalated --> [*]
+    HumanReview --> [*]
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Agents** | LangGraph, LangChain, Gemini / Ollama |
+| **Backend** | FastAPI, Pydantic v2, SQLAlchemy (async), Alembic |
+| **Frontend** | Next.js (App Router), TypeScript, Tailwind, Shadcn UI |
+| **Protocol** | Model Context Protocol (MCP) via FastMCP SDK |
+| **Database** | PostgreSQL 16 |
+| **Infra** | Docker Compose (6 services), GitHub Actions CI |
+| **Quality** | Ruff, Pytest, ESLint, Vitest, Structlog |
+
+## Project Structure
+
+```
 support-ai/
-├── backend/              FastAPI API, LangGraph agents, MCP client, DB models
-├── frontend/             Next.js App Router UI with TypeScript and Tailwind
+├── backend/                 # FastAPI + LangGraph agents + MCP client
+│   ├── app/
+│   │   ├── agents/          # Graph, nodes (router, billing, telemetry, guardrails)
+│   │   ├── api/             # REST + SSE streaming endpoints
+│   │   ├── db/              # SQLAlchemy models, migrations
+│   │   └── mcp_client.py    # MCP tool discovery & invocation
+│   └── tests/
+├── frontend/                # Next.js support console
+│   └── app/                 # Dashboard with live agent observability
 ├── mcp-servers/
-│   ├── billing/          MCP tool: verify_transaction_status
-│   └── telemetry/        MCP tool: get_ride_route_deviation
-├── docker-compose.yml    Local orchestration for all services
-└── README.md
+│   ├── billing/             # verify_transaction_status tool
+│   └── telemetry/           # get_ride_route_deviation tool
+└── docker-compose.yml       # Full-stack orchestration (6 containers)
 ```
-
-```text
-Customer message
-    |
-    v
-FastAPI /api/agents/chat
-    |
-    v
-LangGraph router
-    |
-    |-- BILLING --> BillingAgent --> Billing MCP tool ----|
-    |-- SAFETY  --> TelemetryAgent --> Telemetry MCP tool -|--> GuardrailNode
-    `-- GENERAL --> GenericLLM ---------------------------|
-                                                           |
-                                                           v
-                                                  Resolution decision
-```
-
-## Services
-
-| Service | URL | Purpose |
-| --- | --- | --- |
-| Frontend | http://localhost:3000 | Next.js support console |
-| Backend | http://localhost:8000 | FastAPI API and agent graph |
-| API Docs | http://localhost:8000/docs | OpenAPI documentation |
-| Postgres | localhost:5432 | Local application database |
-| Telemetry MCP | http://localhost:8001/sse | Ride route deviation tool |
-| Billing MCP | http://localhost:8002/sse | Transaction verification tool |
 
 ## Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- uv for local backend development
-- Node.js 20+ for local frontend development
-- Google API key for live router classification
+- Docker & Docker Compose
+- Google API key _or_ Ollama for local LLM inference
 
-### Run With Docker
+### One command setup
 
 ```bash
 cd support-ai
 docker-compose up --build
 ```
 
-### Local Backend
+| Service | URL |
+|---------|-----|
+| Frontend | [localhost:3000](http://localhost:3000) |
+| Backend API | [localhost:8000/docs](http://localhost:8000/docs) |
+| Telemetry MCP | localhost:8001 |
+| Billing MCP | localhost:8002 |
+
+### Local Development
 
 ```bash
-cd support-ai/backend
-uv sync
-uv run uvicorn app.main:app --reload
+# Backend
+cd backend && uv sync && uv run uvicorn app.main:app --reload
+
+# Frontend
+cd frontend && npm install && npm run dev
 ```
 
-### Local Frontend
+## 📡 API Usage
 
+**Stream an agent response:**
 ```bash
-cd support-ai/frontend
-npm install
-npm run dev
+curl -N -X POST http://localhost:8000/api/agents/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message": "I was charged twice for transaction txn_123"}'
 ```
 
-## API Examples
-
-Run the agent graph:
-
-```bash
-curl -X POST http://localhost:8000/api/agents/chat ^
-  -H "Content-Type: application/json" ^
-  -d "{\"message\":\"I was charged twice for transaction_id txn_123\"}"
-```
-
-Stream the agent graph:
-
-```bash
-curl -N -X POST http://localhost:8000/api/agents/chat/stream ^
-  -H "Content-Type: application/json" ^
-  -d "{\"message\":\"My driver took a strange route for ride_id ride_456\"}"
-```
-
-List discovered MCP tools:
-
+**List discovered MCP tools:**
 ```bash
 curl http://localhost:8000/api/mcp/tools
 ```
 
-Invoke a tool directly:
-
+**Invoke a tool directly:**
 ```bash
-curl -X POST http://localhost:8000/api/mcp/invoke ^
-  -H "Content-Type: application/json" ^
-  -d "{\"tool_name\":\"verify_transaction_status\",\"input\":{\"transaction_id\":\"txn_123\"}}"
+curl -X POST http://localhost:8000/api/mcp/invoke \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "verify_transaction_status", "input": {"transaction_id": "txn_123"}}'
 ```
 
-## Environment
-
-The backend reads settings from environment variables or `backend/.env`.
+## Environment Variables
 
 | Variable | Default | Description |
-| --- | --- | --- |
-| `DATABASE_URL` | `postgresql+asyncpg://support_ai:support_ai@localhost:5432/support_ai` | Async SQLAlchemy database URL |
-| `GOOGLE_API_KEY` | empty | Required for live Gemini router classification |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | Router model |
-| `MCP_TELEMETRY_SERVER_URL` | `http://telemetry:8001/sse` | Telemetry MCP endpoint |
-| `MCP_BILLING_SERVER_URL` | `http://billing:8002/sse` | Billing MCP endpoint |
-| `MCP_REQUEST_TIMEOUT` | `30.0` | MCP request timeout in seconds |
+|----------|---------|-------------|
+| `GOOGLE_API_KEY` | — | Gemini API key (not needed if using Ollama) |
+| `USE_OLLAMA` | `True` | Use local Ollama instead of Gemini |
+| `OLLAMA_MODEL` | `gemma4:12b` | Ollama model name |
+| `DATABASE_URL` | `postgresql+asyncpg://...` | Async database connection string |
 
 ## Testing
 
-Backend tests use mocks for LLM and MCP interactions, so they can run without a live
-Google API key or running MCP containers.
-
 ```bash
-cd support-ai/backend
-uv run pytest
-uv run ruff check .
-```
+# Backend (mocks LLM + MCP — no API key needed)
+cd backend && uv run pytest
 
-Frontend checks:
-
-```bash
-cd support-ai/frontend
-npm run lint
-npm run test:run
+# Frontend
+cd frontend && npm run test:run
 ```
 
 ## License
