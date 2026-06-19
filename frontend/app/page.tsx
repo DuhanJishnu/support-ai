@@ -592,15 +592,8 @@ export default function Home() {
     Array<{ type: string; content: string }>
   >([]);
 
-  const {
-    doneData,
-    error,
-    events,
-    isStreaming,
-    latestStatus,
-    startStream,
-    tokenText,
-  } = useAgentStream();
+  const { error, events, isStreaming, latestStatus, startStream, tokenText } =
+    useAgentStream();
   const cleanText = tokenText.replace(/\n+/g, ' ');
   const activeTicket =
     tickets.find((t) => t.id === activeTicketId) || tickets[0];
@@ -661,62 +654,52 @@ export default function Home() {
     setToolCalls([]);
     setDraft('');
 
-    await startStream({
+    const finalDoneData = await startStream({
       message: trimmed,
       conversation_id: conversationId,
       previous_messages: messageHistory,
       extracted_entities: extractedEntities,
     });
 
-    // After stream completes, update the conversation state from doneData
-    // (doneData updates reactively via useMemo, so we read it after stream)
+    // After stream completes, update the conversation state from the returned data
+    if (finalDoneData) {
+      // Update conversation ID
+      if (finalDoneData.conversation_id) {
+        setConversationId(finalDoneData.conversation_id);
+      }
+      // Update extracted entities
+      if (finalDoneData.extracted_entities) {
+        setExtractedEntities(finalDoneData.extracted_entities);
+      }
+      // Add the agent response to message history for next turn
+      const lastMsg = finalDoneData.raw.messages as
+        | Array<{ type: string; content: string }>
+        | undefined;
+      if (lastMsg && lastMsg.length > 0) {
+        // Build updated history: add last human message + agent response
+        const agentMsg = lastMsg[lastMsg.length - 1];
+        setMessageHistory((current) => [
+          ...current,
+          { type: 'human', content: trimmed },
+          { type: agentMsg.type, content: agentMsg.content },
+        ]);
+
+        // Add agent message to visible chat
+        setMessages((current) => [
+          ...current,
+          {
+            id: current.length + 1,
+            author: 'agent',
+            body: String(agentMsg.content),
+            time: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          },
+        ]);
+      }
+    }
   }
-
-  // Sync conversation state when doneData updates (stream completed)
-  const prevDoneRef = useMemo(() => doneData, [doneData]);
-  useMemo(() => {
-    if (!prevDoneRef || isStreaming) return;
-    // Update conversation ID
-    if (prevDoneRef.conversation_id) {
-      setConversationId(prevDoneRef.conversation_id);
-    }
-    // Update extracted entities
-    if (prevDoneRef.extracted_entities) {
-      setExtractedEntities(prevDoneRef.extracted_entities);
-    }
-    // Add the agent response to message history for next turn
-    const lastMsg = prevDoneRef.raw.messages as
-      | Array<{ type: string; content: string }>
-      | undefined;
-    if (lastMsg && lastMsg.length > 0) {
-      // Build updated history: add last human message + agent response
-      const agentMsg = lastMsg[lastMsg.length - 1];
-      setMessageHistory((current) => {
-        const lastHumanDraft = messages[messages.length - 1];
-        const updates = [];
-        if (lastHumanDraft) {
-          updates.push({ type: 'human', content: lastHumanDraft.body });
-        }
-        updates.push({ type: agentMsg.type, content: agentMsg.content });
-        return [...current, ...updates];
-      });
-
-      // Add agent message to visible chat
-      setMessages((current) => [
-        ...current,
-        {
-          id: current.length + 1,
-          author: 'agent',
-          body: String(agentMsg.content),
-          time: new Date().toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-        },
-      ]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prevDoneRef, isStreaming]);
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-zinc-950">

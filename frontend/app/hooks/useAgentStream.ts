@@ -98,6 +98,16 @@ export function useAgentStream() {
     setError(null);
     setIsStreaming(true);
 
+    let finalDoneData: {
+      conversation_id?: string;
+      extracted_entities?: Record<string, unknown>;
+      gathered_context?: Record<string, unknown>;
+      resolution?: Record<string, unknown>;
+      resolution_status?: string;
+      response?: string;
+      raw: Record<string, unknown>;
+    } | null = null;
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/agents/chat/stream`, {
         method: 'POST',
@@ -134,6 +144,18 @@ export function useAgentStream() {
             return;
           }
 
+          if (parsed.type === 'done') {
+            finalDoneData = {
+              conversation_id: parsed.data.conversation_id as string | undefined,
+              extracted_entities: parsed.data.extracted_entities as Record<string, unknown> | undefined,
+              gathered_context: parsed.data.gathered_context as Record<string, unknown> | undefined,
+              resolution: parsed.data.resolution as Record<string, unknown> | undefined,
+              resolution_status: parsed.data.resolution_status as string | undefined,
+              response: parsed.data.response as string | undefined,
+              raw: parsed.data,
+            };
+          }
+
           setEvents((current) => [
             ...current,
             {
@@ -156,6 +178,8 @@ export function useAgentStream() {
     } finally {
       setIsStreaming(false);
     }
+    
+    return finalDoneData;
   }, []);
 
   return {
